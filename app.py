@@ -1,12 +1,25 @@
 import streamlit as st
 import joblib
 import pandas as pd
+import re
 
 # =====================
-# LOAD MODEL
+# LOAD MODEL & TF-IDF
 # =====================
 tfidf = joblib.load("tfidf.pkl")
 model = joblib.load("model_nb.pkl")
+
+# =====================
+# PREPROCESS (WAJIB SAMA DENGAN TRAINING)
+# =====================
+def clean_text(text):
+    if not isinstance(text, str):
+        return ""
+    text = text.lower()
+    text = re.sub(r"http\S+|www\S+", "", text)   # hapus URL
+    text = re.sub(r"[^a-z\s]", " ", text)        # hapus angka & simbol
+    text = re.sub(r"\s+", " ", text).strip()     # rapikan spasi
+    return text
 
 # =====================
 # PAGE CONFIG
@@ -18,7 +31,7 @@ st.set_page_config(
 )
 
 st.title("💬 Analisis Sentimen Ulasan Akulaku")
-st.write("Klasifikasi sentimen: **Positif – Netral – Negatif**")
+st.write("Klasifikasi sentimen: **positif – netral – negatif**")
 
 # =====================
 # TAB MENU
@@ -26,7 +39,7 @@ st.write("Klasifikasi sentimen: **Positif – Netral – Negatif**")
 tab1, tab2 = st.tabs(["🔍 Input Manual", "📂 Upload CSV"])
 
 # ======================================================
-# TAB 1 : INPUT MANUAL
+# TAB 1 : INPUT MANUAL (AMAN)
 # ======================================================
 with tab1:
     text = st.text_area(
@@ -39,18 +52,19 @@ with tab1:
         if text.strip() == "":
             st.warning("Masukkan teks terlebih dahulu!")
         else:
-            vec = tfidf.transform([text])
+            text_clean = clean_text(text)
+            vec = tfidf.transform([text_clean])
             pred = model.predict(vec)[0]
 
             if pred == "positif":
-                st.success("😊 Sentimen: POSITIF")
+                st.success("😊 Sentimen: positif")
             elif pred == "netral":
-                st.info("😐 Sentimen: NETRAL")
+                st.info("😐 Sentimen: netral")
             else:
-                st.error("😡 Sentimen: NEGATIF")
+                st.error("😡 Sentimen: negatif")
 
 # ======================================================
-# TAB 2 : CSV (ANTI MessageSizeError)
+# TAB 2 : UPLOAD CSV (ANTI ERROR & SESUAI)
 # ======================================================
 with tab2:
     st.write("Upload file CSV berisi ulasan pengguna")
@@ -65,7 +79,7 @@ with tab2:
 
         st.success(f"📄 Data berhasil dimuat: {len(df)} baris")
 
-        # ⚠️ TAMPILKAN DATA TERBATAS SAJA
+        # Tampilkan TERBATAS (ANTI MessageSizeError)
         st.write("🔍 Preview data (100 baris pertama):")
         st.dataframe(df.head(100), use_container_width=True)
 
@@ -75,19 +89,22 @@ with tab2:
         )
 
         if st.button("Analisis Sentimen CSV"):
-            teks = df[col_text].astype(str)
+            # =====================
+            # AMBIL & BERSIHKAN TEKS
+            # =====================
+            teks = df[col_text].fillna("").astype(str)
+            teks_clean = teks.apply(clean_text)
 
             # =====================
-            # PROSES MODEL (FULL DATA)
+            # TRANSFORM & PREDIKSI
             # =====================
-            vec = tfidf.transform(teks)
+            vec = tfidf.transform(teks_clean)
             preds = model.predict(vec)
 
-            df["sentimen"] = pd.Series(preds).map({
-                "positif": "Positif",
-                "netral": "Netral",
-                "negatif": "Negatif"
-            })
+            # =====================
+            # SIMPAN HASIL (ASLI MODEL)
+            # =====================
+            df["sentimen"] = preds
 
             st.success("✅ Analisis sentimen selesai")
 
@@ -97,7 +114,6 @@ with tab2:
             st.subheader("📊 Ringkasan Sentimen")
             sent_count = df["sentimen"].value_counts()
             st.table(sent_count)
-
             st.bar_chart(sent_count)
 
             # =====================
