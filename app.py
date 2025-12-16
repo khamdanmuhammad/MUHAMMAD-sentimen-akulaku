@@ -41,7 +41,6 @@ with tab1:
         else:
             vec = tfidf.transform([text])
             pred = model.predict(vec)[0]
-            prob = model.predict_proba(vec)[0]
 
             if pred == "positif":
                 st.success("😊 Sentimen: POSITIF")
@@ -50,15 +49,8 @@ with tab1:
             else:
                 st.error("😡 Sentimen: NEGATIF")
 
-            df_prob = pd.DataFrame({
-                "Sentimen": model.classes_,
-                "Probabilitas": prob
-            })
-
-            st.bar_chart(df_prob.set_index("Sentimen"))
-
 # ======================================================
-# TAB 2 : UPLOAD CSV
+# TAB 2 : CSV (ANTI MessageSizeError)
 # ======================================================
 with tab2:
     st.write("Upload file CSV berisi ulasan pengguna")
@@ -70,10 +62,13 @@ with tab2:
 
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
-        st.write("📄 Preview Data:")
-        st.dataframe(df.head())
 
-        # Pilih kolom teks
+        st.success(f"📄 Data berhasil dimuat: {len(df)} baris")
+
+        # ⚠️ TAMPILKAN DATA TERBATAS SAJA
+        st.write("🔍 Preview data (100 baris pertama):")
+        st.dataframe(df.head(100), use_container_width=True)
+
         col_text = st.selectbox(
             "Pilih kolom yang berisi teks ulasan:",
             df.columns
@@ -82,32 +77,36 @@ with tab2:
         if st.button("Analisis Sentimen CSV"):
             teks = df[col_text].astype(str)
 
+            # =====================
+            # PROSES MODEL (FULL DATA)
+            # =====================
             vec = tfidf.transform(teks)
             preds = model.predict(vec)
 
-            # Tambahkan hasil sentimen
-            df["sentimen"] = preds
-
-            # Mapping label (BIAR PASTI SESUAI)
-            df["sentimen"] = df["sentimen"].map({
+            df["sentimen"] = pd.Series(preds).map({
                 "positif": "Positif",
                 "netral": "Netral",
                 "negatif": "Negatif"
             })
 
-            st.success("✅ Analisis selesai!")
-            st.dataframe(df)
+            st.success("✅ Analisis sentimen selesai")
 
-            # Rekap jumlah sentimen
-            st.subheader("📊 Distribusi Sentimen")
+            # =====================
+            # RINGKASAN (AMAN)
+            # =====================
+            st.subheader("📊 Ringkasan Sentimen")
             sent_count = df["sentimen"].value_counts()
+            st.table(sent_count)
+
             st.bar_chart(sent_count)
 
-            # Download hasil
+            # =====================
+            # DOWNLOAD FULL DATA
+            # =====================
             csv_out = df.to_csv(index=False).encode("utf-8")
             st.download_button(
-                "⬇️ Download Hasil CSV",
-                csv_out,
-                "hasil_analisis_sentimen.csv",
-                "text/csv"
+                "⬇️ Download Hasil Lengkap (CSV)",
+                data=csv_out,
+                file_name="hasil_analisis_sentimen.csv",
+                mime="text/csv"
             )
