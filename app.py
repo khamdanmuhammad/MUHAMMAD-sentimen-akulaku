@@ -2,7 +2,6 @@ import streamlit as st
 import joblib
 import pandas as pd
 import re
-import numpy as np
 
 # =====================
 # LOAD MODEL
@@ -14,14 +13,11 @@ model = joblib.load("model_nb.pkl")
 # PREPROCESS
 # =====================
 def clean_text(text):
-    try:
-        text = str(text).lower()
-        text = re.sub(r"http\S+|www\S+", "", text)
-        text = re.sub(r"[^a-z\s]", " ", text)
-        text = re.sub(r"\s+", " ", text).strip()
-        return text
-    except:
-        return ""
+    text = str(text).lower()
+    text = re.sub(r"http\S+|www\S+", "", text)
+    text = re.sub(r"[^a-z\s]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 # =====================
 # PAGE CONFIG
@@ -35,18 +31,26 @@ st.set_page_config(
 st.title("💬 Analisis Sentimen Ulasan Akulaku")
 st.write("Klasifikasi sentimen: **positif – netral – negatif**")
 
+# =====================
+# TAB MENU
+# =====================
 tab1, tab2 = st.tabs(["🔍 Input Manual", "📂 Upload CSV"])
 
 # ======================================================
-# TAB 1 : MANUAL
+# TAB 1 : INPUT MANUAL
 # ======================================================
 with tab1:
-    text = st.text_area("Masukkan ulasan pengguna:")
+    text = st.text_area(
+        "Masukkan ulasan pengguna:",
+        height=150,
+        placeholder="Contoh: aplikasinya cukup membantu tapi kadang error"
+    )
 
     if st.button("Analisis Sentimen (Manual)"):
-        try:
-            text_clean = clean_text(text)
-            vec = tfidf.transform([text_clean])
+        if text.strip() == "":
+            st.warning("Masukkan teks terlebih dahulu!")
+        else:
+            vec = tfidf.transform([clean_text(text)])
             pred = model.predict(vec)[0]
 
             if pred == "positif":
@@ -55,27 +59,51 @@ with tab1:
                 st.info("😐 Sentimen: netral")
             else:
                 st.error("😡 Sentimen: negatif")
-        except Exception as e:
-            st.error("Terjadi kesalahan pada input teks")
-            st.code(str(e))
 
 # ======================================================
-# TAB 2 : CSV (SUPER AMAN)
+# TAB 2 : UPLOAD CSV (FIX)
 # ======================================================
 with tab2:
-    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+    st.write("Upload file CSV berisi ulasan pengguna")
+
+    uploaded_file = st.file_uploader(
+        "Upload CSV",
+        type=["csv"]
+    )
 
     if uploaded_file is not None:
-        try:
-            df = pd.read_csv(
-                uploaded_file,
-                encoding="utf-8",
-                errors="ignore"
+        df = pd.read_csv(uploaded_file)
+
+        st.success(f"📄 Data berhasil dimuat: {len(df)} baris")
+
+        st.write("🔍 Preview data (50 baris pertama):")
+        st.dataframe(df.head(50), use_container_width=True)
+
+        # ✅ KURUNG SUDAH BENAR
+        col_text = st.selectbox(
+            "Pilih kolom yang berisi teks ulasan:",
+            options=df.columns
+        )
+
+        if st.button("Analisis Sentimen CSV"):
+            teks = df[col_text].fillna("").apply(clean_text)
+
+            vec = tfidf.transform(teks)
+            preds = model.predict(vec)
+
+            df["sentimen"] = preds
+
+            st.success("✅ Analisis sentimen selesai")
+
+            st.subheader("📊 Ringkasan Sentimen")
+            sent_count = df["sentimen"].value_counts()
+            st.table(sent_count)
+            st.bar_chart(sent_count)
+
+            csv_out = df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "⬇️ Download Hasil Lengkap (CSV)",
+                data=csv_out,
+                file_name="hasil_analisis_sentimen.csv",
+                mime="text/csv"
             )
-
-            st.success(f"📄 Data dimuat: {len(df)} baris")
-            st.dataframe(df.head(50))
-
-            col_text = st.selectbox(
-                "Pilih kolom teks ulasan",
-                df.columns
