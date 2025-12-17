@@ -27,7 +27,13 @@ box-shadow:0 4px 10px rgba(0,0,0,.08);margin-bottom:20px}
 """, unsafe_allow_html=True)
 
 # ================== NLTK ==================
-nltk.download("stopwords")
+import nltk
+
+try:
+    nltk.data.find("corpora/stopwords")
+except LookupError:
+    nltk.download("stopwords")
+
 stop_words = set(stopwords.words("indonesian"))
 
 # ================== FUNGSI CLEAN ==================
