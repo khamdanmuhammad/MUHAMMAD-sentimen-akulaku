@@ -31,17 +31,17 @@ box-shadow:0 4px 10px rgba(0,0,0,.08);margin-bottom:20px}
 st.markdown("""
 <div class="card">
 <h1>📊 Sistem Analisis Sentimen Akulaku</h1>
-<p>Anti Error • Anti Kebalik • Siap Sidang • Siap Cloud</p>
+<p>Upload Dataset • Training Otomatis • Prediksi • Dashboard • Download CSV</p>
 </div>
 """, unsafe_allow_html=True)
 
 # ================== MENU ==================
 menu = st.sidebar.selectbox(
-    "Menu",
+    "📌 Menu",
     ["Upload Dataset (Opsional)", "Prediksi Kalimat", "Dashboard"]
 )
 
-# ================== NLTK AMAN ==================
+# ================== NLTK ==================
 try:
     nltk.data.find("corpora/stopwords")
 except LookupError:
@@ -49,7 +49,7 @@ except LookupError:
 
 stop_words = set(stopwords.words("indonesian"))
 
-# ================== FUNGSI CLEAN ==================
+# ================== CLEAN TEXT ==================
 def clean_text(text):
     text = str(text).lower()
     text = re.sub(r"http\S+|www\S+", "", text)
@@ -106,13 +106,18 @@ def predict_safe(text):
 # ================== UPLOAD DATASET ==================
 if menu == "Upload Dataset (Opsional)":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    file = st.file_uploader("Upload CSV", type=["csv"])
 
-    if file is not None:
+    st.markdown("### 📂 Upload Dataset CSV")
+    st.write("✔ Mendukung berbagai encoding (UTF-8, Latin1, ISO)")
+    st.write("✔ Training otomatis TF-IDF & Naïve Bayes")
+
+    file = st.file_uploader("Upload file CSV", type=["csv"])
+
+    if file:
         df = load_csv_safe(file)
 
         if df is None:
-            st.error("❌ CSV tidak bisa dibaca")
+            st.error("❌ File CSV tidak bisa dibaca")
         else:
             text_col = df.columns[0]
 
@@ -121,24 +126,22 @@ if menu == "Upload Dataset (Opsional)":
 
             train_model(df)
 
-            # SIMPAN KE SESSION
             st.session_state["df_result"] = df.copy()
             st.session_state["text_col"] = text_col
 
-            st.success("✅ Dataset berhasil diproses")
+            st.success("✅ Dataset berhasil diproses & model dilatih")
             st.dataframe(df[[text_col, "sentiment"]].head())
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ================== PREDIKSI KALIMAT ==================
+# ================== PREDIKSI ==================
 elif menu == "Prediksi Kalimat":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
+
+    st.markdown("### ✍️ Prediksi Sentimen Kalimat")
     text = st.text_area("Masukkan kalimat ulasan")
 
     if st.button("Analisis Sentimen"):
-        if not os.path.exists("model/model.pkl"):
-            st.info("ℹ️ Model belum dilatih, memakai rule-based")
-
         hasil = predict_safe(text)
 
         if hasil == "Positif":
@@ -154,36 +157,49 @@ elif menu == "Prediksi Kalimat":
 elif menu == "Dashboard":
 
     if "df_result" not in st.session_state:
-        st.warning("⚠️ Silakan upload dataset terlebih dahulu")
+        st.warning("⚠️ Upload dataset terlebih dahulu")
         st.stop()
 
     df = st.session_state["df_result"]
     text_col = st.session_state["text_col"]
 
-    st.markdown("<div class='card'><h2>📊 Dashboard Sentimen</h2></div>", unsafe_allow_html=True)
+    st.markdown("<div class='card'><h2>📊 Dashboard Analisis Sentimen</h2></div>", unsafe_allow_html=True)
+
+    with st.expander("📌 Fitur Dashboard"):
+        st.markdown("""
+        - 📂 Upload dataset CSV  
+        - 🧠 Training otomatis TF-IDF & Naïve Bayes  
+        - ✍️ Prediksi sentimen real-time  
+        - 📊 Ringkasan sentimen  
+        - 📈 Visualisasi grafik batang  
+        - ⬇️ Download hasil ulasan + sentimen  
+        - 🛡️ Fallback rule-based  
+        """)
 
     col1, col2, col3 = st.columns(3)
+    pos = (df["sentiment"] == "Positif").sum()
+    net = (df["sentiment"] == "Netral").sum()
+    neg = (df["sentiment"] == "Negatif").sum()
 
-    pos_count = (df["sentiment"] == "Positif").sum()
-    net_count = (df["sentiment"] == "Netral").sum()
-    neg_count = (df["sentiment"] == "Negatif").sum()
+    col1.markdown(f"<div class='card'><p class='pos'>Positif<br>{pos}</p></div>", unsafe_allow_html=True)
+    col2.markdown(f"<div class='card'><p class='net'>Netral<br>{net}</p></div>", unsafe_allow_html=True)
+    col3.markdown(f"<div class='card'><p class='neg'>Negatif<br>{neg}</p></div>", unsafe_allow_html=True)
 
-    col1.markdown(f"<p class='pos'>Positif<br>{pos_count}</p>", unsafe_allow_html=True)
-    col2.markdown(f"<p class='net'>Netral<br>{net_count}</p>", unsafe_allow_html=True)
-    col3.markdown(f"<p class='neg'>Negatif<br>{neg_count}</p>", unsafe_allow_html=True)
-
+    st.markdown("### 📄 Data Ulasan & Sentimen")
     st.dataframe(df[[text_col, "sentiment"]], use_container_width=True)
 
-    csv = df[[text_col, "sentiment"]].to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "📥 Download Ulasan + Sentimen",
-        csv,
-        "hasil_ulasan_sentimen_akulaku.csv",
-        "text/csv"
-    )
-
+    st.markdown("### 📈 Visualisasi Grafik Batang")
     fig, ax = plt.subplots()
     df["sentiment"].value_counts().plot(kind="bar", ax=ax)
     ax.set_xlabel("Sentimen")
     ax.set_ylabel("Jumlah")
     st.pyplot(fig)
+
+    st.markdown("### ⬇️ Download Hasil Ulasan")
+    csv = df[[text_col, "sentiment"]].to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "📥 Download Ulasan + Sentimen (CSV)",
+        csv,
+        "hasil_ulasan_sentimen_akulaku.csv",
+        "text/csv"
+    )
