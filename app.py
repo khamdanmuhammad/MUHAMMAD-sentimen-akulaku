@@ -26,8 +26,8 @@ st.markdown("""
 .card {
     background-color: white;
     padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    border-radius: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     margin-bottom: 20px;
 }
 
@@ -37,6 +37,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ================== NLTK ==================
 nltk.download('stopwords')
 stop_words = set(stopwords.words('indonesian'))
 
@@ -56,12 +57,22 @@ def label_sentiment(score):
     else:
         return "Negatif"
 
+def load_csv_safe(uploaded_file):
+    """Anti UnicodeDecodeError"""
+    try:
+        return pd.read_csv(uploaded_file, encoding="utf-8")
+    except UnicodeDecodeError:
+        try:
+            return pd.read_csv(uploaded_file, encoding="latin1")
+        except UnicodeDecodeError:
+            return pd.read_csv(uploaded_file, encoding="ISO-8859-1")
+
 def train_model(df):
     X = df["clean"]
     y = df["sentiment"]
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+        X, y, test_size=0.2, random_state=42, stratify=y
     )
 
     tfidf = TfidfVectorizer(max_features=3000)
@@ -97,7 +108,7 @@ def predict_text(text):
 st.markdown("""
 <div class="card">
 <h1>📊 Sistem Analisis Sentimen Aplikasi Akulaku</h1>
-<p>Metode <b>Naïve Bayes</b> dengan <b>TF-IDF</b> berbasis Streamlit</p>
+<p>Menggunakan <b>Naïve Bayes</b> dan <b>TF-IDF</b> berbasis Streamlit</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -114,48 +125,55 @@ menu = st.sidebar.selectbox(
 if menu == "Upload Dataset":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("📁 Upload Dataset CSV")
-    file = st.file_uploader("File harus memiliki kolom: content & score", type=["csv"])
+    file = st.file_uploader(
+        "Wajib ada kolom: content & score",
+        type=["csv"]
+    )
     st.markdown("</div>", unsafe_allow_html=True)
 
     if file:
-        df = pd.read_csv(file)
+        try:
+            df = load_csv_safe(file)
 
-        if "content" not in df.columns or "score" not in df.columns:
-            st.error("CSV harus punya kolom: content & score")
-        else:
-            df["clean"] = df["content"].apply(clean_text)
-            df["sentiment"] = df["score"].apply(label_sentiment)
+            if "content" not in df.columns or "score" not in df.columns:
+                st.error("❌ CSV harus memiliki kolom: content dan score")
+            else:
+                df["clean"] = df["content"].apply(clean_text)
+                df["sentiment"] = df["score"].apply(label_sentiment)
 
-            st.session_state["df"] = df
+                st.session_state["df"] = df
 
-            st.success("Dataset berhasil diproses")
-            st.dataframe(df.head())
+                st.success("✅ Dataset berhasil dibaca TANPA error encoding")
+                st.dataframe(df.head())
 
-            st.bar_chart(df["sentiment"].value_counts())
+                st.bar_chart(df["sentiment"].value_counts())
+
+        except Exception:
+            st.error("❌ File CSV tidak valid atau rusak")
 
 # ================== TRAIN ==================
 elif menu == "Training Model":
     if "df" not in st.session_state:
-        st.warning("Upload dataset terlebih dahulu")
+        st.warning("⚠️ Upload dataset terlebih dahulu")
     else:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.subheader("⚙️ Training Model")
         if st.button("Latih Model"):
             model, X_test, y_test = train_model(st.session_state["df"])
             st.session_state["model_data"] = (model, X_test, y_test)
-            st.success("Model berhasil dilatih")
+            st.success("✅ Model berhasil dilatih dan disimpan")
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ================== EVALUASI ==================
 elif menu == "Evaluasi Model":
     if "model_data" not in st.session_state:
-        st.warning("Latih model terlebih dahulu")
+        st.warning("⚠️ Latih model terlebih dahulu")
     else:
         model, X_test, y_test = st.session_state["model_data"]
         acc, prec, rec, f1 = evaluate_model(model, X_test, y_test)
 
         st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.subheader("📈 Hasil Evaluasi Model")
+        st.subheader("📈 Evaluasi Model")
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Accuracy", f"{acc:.2%}")
@@ -170,25 +188,28 @@ elif menu == "Prediksi Kalimat":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("📝 Prediksi Sentimen Kalimat")
     text = st.text_area("Masukkan kalimat ulasan")
+
     if st.button("Analisis Sentimen"):
         if text.strip() == "":
-            st.warning("Kalimat tidak boleh kosong")
+            st.warning("⚠️ Kalimat tidak boleh kosong")
         elif not os.path.exists("model/model.pkl"):
-            st.error("Model belum dilatih")
+            st.error("❌ Model belum dilatih")
         else:
             hasil = predict_text(text)
+
             if hasil == "Positif":
                 st.markdown("<p class='positif'>✅ Positif</p>", unsafe_allow_html=True)
             elif hasil == "Netral":
                 st.markdown("<p class='netral'>⚖️ Netral</p>", unsafe_allow_html=True)
             else:
                 st.markdown("<p class='negatif'>❌ Negatif</p>", unsafe_allow_html=True)
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ================== FOOTER ==================
 st.markdown("---")
 st.markdown(
-    "<center><small>© 2025 | Sistem Analisis Sentimen Akulaku "
-    "– Naïve Bayes & TF-IDF</small></center>",
+    "<center><small>© 2025 | Sistem Analisis Sentimen Akulaku – "
+    "Naïve Bayes & TF-IDF</small></center>",
     unsafe_allow_html=True
 )
