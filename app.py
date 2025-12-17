@@ -37,13 +37,18 @@ def clean_text(text):
     text = re.sub(r"[^a-z\s]", "", text)
     return " ".join([w for w in text.split() if w not in stop_words])
 
+# 🔒 LABEL SENTIMENT AMAN (ANTI ERROR)
 def label_sentiment(score):
-    if score >= 4:
-        return "Positif"
-    elif score == 3:
+    try:
+        score = float(score)
+        if score >= 4:
+            return "Positif"
+        elif score == 3:
+            return "Netral"
+        else:
+            return "Negatif"
+    except:
         return "Netral"
-    else:
-        return "Negatif"
 
 # ================== RULE BASED (FALLBACK) ==================
 NEGATIVE_WORDS = ["bajingan", "jelek", "buruk", "penipu", "parah", "sampah"]
@@ -83,8 +88,6 @@ def train_model(df):
     joblib.dump(model, "model/model.pkl")
     joblib.dump(tfidf, "model/tfidf.pkl")
 
-    return model, tfidf
-
 # ================== PREDIKSI AMAN ==================
 def predict_safe(text):
     # MODE 1: MODEL ML
@@ -93,7 +96,8 @@ def predict_safe(text):
         tfidf = joblib.load("model/tfidf.pkl")
         vec = tfidf.transform([clean_text(text)])
         return model.predict(vec)[0]
-    # MODE 2: FALLBACK
+
+    # MODE 2: RULE BASED (PASTI ADA OUTPUT)
     return rule_based_sentiment(text)
 
 # ================== HEADER ==================
@@ -118,13 +122,27 @@ if menu == "Upload Dataset (Opsional)":
         df = load_csv_safe(file)
 
         if df is None:
-            st.error("CSV tidak dapat dibaca")
+            st.error("❌ CSV tidak dapat dibaca")
         else:
-            # AUTO DETECT KOLOM
-            text_col = df.columns[0]
-            score_col = df.columns[-1]
+            # 🔍 AUTO DETECT KOLOM CERDAS
+            text_candidates = ["content", "review", "ulasan", "text"]
+            score_candidates = ["score", "rating", "star", "rate"]
 
-            df["clean"] = df[text_col].apply(clean_text)
+            text_col = None
+            score_col = None
+
+            for c in df.columns:
+                if c.lower() in text_candidates:
+                    text_col = c
+                if c.lower() in score_candidates:
+                    score_col = c
+
+            if text_col is None:
+                text_col = df.columns[0]
+            if score_col is None:
+                score_col = df.columns[-1]
+
+            df["clean"] = df[text_col].astype(str).apply(clean_text)
             df["sentiment"] = df[score_col].apply(label_sentiment)
 
             train_model(df)
