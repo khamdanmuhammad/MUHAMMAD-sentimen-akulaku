@@ -30,29 +30,16 @@ box-shadow:0 4px 10px rgba(0,0,0,.08);margin-bottom:20px}
 nltk.download("stopwords")
 stop_words = set(stopwords.words("indonesian"))
 
-# ================== FUNGSI DASAR ==================
+# ================== FUNGSI CLEAN ==================
 def clean_text(text):
     text = str(text).lower()
     text = re.sub(r"http\S+|www\S+", "", text)
     text = re.sub(r"[^a-z\s]", "", text)
     return " ".join([w for w in text.split() if w not in stop_words])
 
-# 🔒 LABEL SENTIMENT AMAN (ANTI ERROR)
-def label_sentiment(score):
-    try:
-        score = float(score)
-        if score >= 4:
-            return "Positif"
-        elif score == 3:
-            return "Netral"
-        else:
-            return "Negatif"
-    except:
-        return "Netral"
-
-# ================== RULE BASED (FALLBACK) ==================
-NEGATIVE_WORDS = ["bajingan", "jelek", "buruk", "penipu", "parah", "sampah"]
-POSITIVE_WORDS = ["bagus", "mantap", "baik", "membantu", "recommended"]
+# ================== RULE BASED (PASTI BENAR ARAH) ==================
+NEGATIVE_WORDS = ["bajingan", "jelek", "buruk", "penipu", "parah", "sampah", "kecewa"]
+POSITIVE_WORDS = ["bagus", "mantap", "baik", "membantu", "recommended", "puas"]
 
 def rule_based_sentiment(text):
     text = text.lower()
@@ -63,6 +50,20 @@ def rule_based_sentiment(text):
         if w in text:
             return "Positif"
     return "Netral"
+
+# ================== LABEL DARI RATING (AMAN) ==================
+def label_from_score(score, text):
+    try:
+        score = float(score)
+        if score >= 4:
+            return "Positif"
+        elif score == 3:
+            return "Netral"
+        else:
+            return "Negatif"
+    except:
+        # kalau rating rusak → pakai teks
+        return rule_based_sentiment(text)
 
 # ================== LOAD CSV AMAN ==================
 def load_csv_safe(file):
@@ -90,21 +91,21 @@ def train_model(df):
 
 # ================== PREDIKSI AMAN ==================
 def predict_safe(text):
-    # MODE 1: MODEL ML
+    # MODE ML
     if os.path.exists("model/model.pkl"):
         model = joblib.load("model/model.pkl")
         tfidf = joblib.load("model/tfidf.pkl")
         vec = tfidf.transform([clean_text(text)])
         return model.predict(vec)[0]
 
-    # MODE 2: RULE BASED (PASTI ADA OUTPUT)
+    # MODE FALLBACK
     return rule_based_sentiment(text)
 
 # ================== HEADER ==================
 st.markdown("""
 <div class="card">
 <h1>📊 Sistem Analisis Sentimen Akulaku</h1>
-<p>Anti Error • Siap Sidang • Siap Cloud</p>
+<p>Anti Error • Anti Kebalik • Siap Sidang • Siap Cloud</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -113,10 +114,10 @@ menu = st.sidebar.selectbox(
     ["Upload Dataset (Opsional)", "Prediksi Kalimat"]
 )
 
-# ================== UPLOAD (TIDAK WAJIB) ==================
+# ================== UPLOAD CSV ==================
 if menu == "Upload Dataset (Opsional)":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    file = st.file_uploader("Upload CSV (opsional)", type=["csv"])
+    file = st.file_uploader("Upload CSV (bebas format kolom)", type=["csv"])
 
     if file:
         df = load_csv_safe(file)
@@ -124,7 +125,7 @@ if menu == "Upload Dataset (Opsional)":
         if df is None:
             st.error("❌ CSV tidak dapat dibaca")
         else:
-            # 🔍 AUTO DETECT KOLOM CERDAS
+            # DETEKSI KOLOM CERDAS
             text_candidates = ["content", "review", "ulasan", "text"]
             score_candidates = ["score", "rating", "star", "rate"]
 
@@ -139,19 +140,25 @@ if menu == "Upload Dataset (Opsional)":
 
             if text_col is None:
                 text_col = df.columns[0]
-            if score_col is None:
-                score_col = df.columns[-1]
 
             df["clean"] = df[text_col].astype(str).apply(clean_text)
-            df["sentiment"] = df[score_col].apply(label_sentiment)
+
+            # 🔥 INTI PERBAIKAN
+            if score_col is not None:
+                df["sentiment"] = df.apply(
+                    lambda x: label_from_score(x[score_col], x[text_col]), axis=1
+                )
+            else:
+                df["sentiment"] = df[text_col].apply(rule_based_sentiment)
 
             train_model(df)
-            st.success("✅ Model berhasil dibuat dari dataset")
-            st.dataframe(df.head())
+
+            st.success("✅ Dataset diproses & model berhasil dibuat")
+            st.dataframe(df[[text_col, "sentiment"]].head())
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ================== PREDIKSI ==================
+# ================== PREDIKSI KALIMAT ==================
 elif menu == "Prediksi Kalimat":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     text = st.text_area("Masukkan kalimat ulasan")
