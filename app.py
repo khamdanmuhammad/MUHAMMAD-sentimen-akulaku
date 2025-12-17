@@ -121,7 +121,7 @@ if menu == "Upload Dataset (Opsional)":
 
             train_model(df)
 
-            # 🔥 SIMPAN KE SESSION (KUNCI SEMUANYA)
+            # SIMPAN KE SESSION
             st.session_state["df_result"] = df.copy()
             st.session_state["text_col"] = text_col
 
@@ -163,4 +163,27 @@ elif menu == "Dashboard":
     st.markdown("<div class='card'><h2>📊 Dashboard Sentimen</h2></div>", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
-    col1.markdown(f"<p class='pos'>Positif<br>{(
+
+    pos_count = (df["sentiment"] == "Positif").sum()
+    net_count = (df["sentiment"] == "Netral").sum()
+    neg_count = (df["sentiment"] == "Negatif").sum()
+
+    col1.markdown(f"<p class='pos'>Positif<br>{pos_count}</p>", unsafe_allow_html=True)
+    col2.markdown(f"<p class='net'>Netral<br>{net_count}</p>", unsafe_allow_html=True)
+    col3.markdown(f"<p class='neg'>Negatif<br>{neg_count}</p>", unsafe_allow_html=True)
+
+    st.dataframe(df[[text_col, "sentiment"]], use_container_width=True)
+
+    csv = df[[text_col, "sentiment"]].to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "📥 Download Ulasan + Sentimen",
+        csv,
+        "hasil_ulasan_sentimen_akulaku.csv",
+        "text/csv"
+    )
+
+    fig, ax = plt.subplots()
+    df["sentiment"].value_counts().plot(kind="bar", ax=ax)
+    ax.set_xlabel("Sentimen")
+    ax.set_ylabel("Jumlah")
+    st.pyplot(fig)
