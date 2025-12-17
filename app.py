@@ -189,3 +189,18 @@ elif menu == "Prediksi Kalimat":
             st.markdown("<p class='neg'>❌ Negatif</p>", unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
+
+# ================== DOWNLOAD ULASAN ==================
+st.markdown("### ⬇️ Download Data Ulasan")
+
+download_df = df_show[[text_col, "sentiment"]].copy()
+
+csv_data = download_df.to_csv(index=False).encode("utf-8")
+
+st.download_button(
+    label="📥 Download Ulasan + Sentimen (CSV)",
+    data=csv_data,
+    file_name="hasil_ulasan_sentimen_akulaku.csv",
+    mime="text/csv"
+)
+
