@@ -25,14 +25,26 @@ stop_words = set(stopwords.words("indonesian"))
 def clean_text(text):
     if pd.isna(text):
         return ""
-
     text = text.lower()
     text = re.sub(r"http\S+|www\S+", "", text)
     text = re.sub(r"[^a-zA-Z\s]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
-
     tokens = [w for w in text.split() if w not in stop_words and len(w) > 2]
     return " ".join(tokens)
+
+# ================== RULE-BASED SENTIMENT ==================
+POSITIVE_WORDS = ["bagus", "mantap", "baik", "puas", "recommended", "cepat"]
+NEGATIVE_WORDS = ["buruk", "jelek", "parah", "kecewa", "lama", "error", "penipu"]
+
+def rule_based_sentiment(text):
+    text = str(text).lower()
+    for w in NEGATIVE_WORDS:
+        if w in text:
+            return "Negatif"
+    for w in POSITIVE_WORDS:
+        if w in text:
+            return "Positif"
+    return "Netral"
 
 # ================== NORMALISASI LABEL ==================
 def normalize_label(x):
@@ -103,18 +115,24 @@ if menu == "📂 Upload Dataset":
             st.error("Gagal membaca file CSV")
             st.stop()
 
+        # Deteksi kolom teks
         text_col = detect_column(df, ["review", "ulasan", "komentar", "content", "text"])
+        if text_col is None:
+            text_col = df.columns[0]  # fallback aman
+
+        # Deteksi / buat label
         label_col = detect_column(df, ["sentiment", "label", "polarity"])
+        if label_col is None:
+            st.warning("Kolom label tidak ditemukan → label dibuat otomatis (rule-based)")
+            df["sentiment"] = df[text_col].astype(str).apply(rule_based_sentiment)
+            label_col = "sentiment"
 
-        if text_col is None or label_col is None:
-            st.error("Kolom teks atau label tidak ditemukan")
-            st.stop()
-
+        # Preprocessing
         df[text_col] = df[text_col].apply(clean_text)
         df[label_col] = df[label_col].apply(normalize_label)
         df = df[df[text_col].str.len() > 3]
 
-        st.subheader("Distribusi Data Asli")
+        st.subheader("Distribusi Sentimen")
         st.bar_chart(df[label_col].value_counts())
 
         train_model(df, text_col, label_col)
@@ -123,7 +141,7 @@ if menu == "📂 Upload Dataset":
         st.session_state.text_col = text_col
         st.session_state.label_col = label_col
 
-        st.success("✅ Dataset & model berhasil dilatih")
+        st.success("✅ Dataset berhasil diproses & model dilatih")
 
 # ================== PREDIKSI ==================
 elif menu == "✍️ Prediksi Kalimat":
