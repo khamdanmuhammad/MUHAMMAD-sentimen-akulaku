@@ -21,7 +21,7 @@ except LookupError:
 
 stop_words = set(stopwords.words("indonesian"))
 
-# ================== CLEAN TEXT (AMAN) ==================
+# ================== CLEAN TEXT ==================
 def clean_text(text):
     if pd.isna(text):
         return ""
@@ -31,10 +31,7 @@ def clean_text(text):
     text = re.sub(r"[^a-zA-Z\s]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
 
-    tokens = [
-        w for w in text.split()
-        if w not in stop_words and len(w) > 2
-    ]
+    tokens = [w for w in text.split() if w not in stop_words and len(w) > 2]
     return " ".join(tokens)
 
 # ================== NORMALISASI LABEL ==================
@@ -72,7 +69,6 @@ def train_model(df, text_col, label_col):
         ngram_range=(1, 2),
         max_features=15000
     )
-
     X = vectorizer.fit_transform(df[text_col])
     y = df[label_col]
 
@@ -83,7 +79,7 @@ def train_model(df, text_col, label_col):
     joblib.dump(model, "model/model.pkl")
     joblib.dump(vectorizer, "model/tfidf.pkl")
 
-# ================== STREAMLIT UI ==================
+# ================== UI ==================
 st.title("📊 Sistem Analisis Sentimen Akulaku")
 
 menu = st.sidebar.selectbox(
@@ -96,7 +92,6 @@ menu = st.sidebar.selectbox(
         "⚙️ Pengaturan Grafik"
     ]
 )
-
 
 # ================== UPLOAD DATASET ==================
 if menu == "📂 Upload Dataset":
@@ -117,7 +112,6 @@ if menu == "📂 Upload Dataset":
 
         df[text_col] = df[text_col].apply(clean_text)
         df[label_col] = df[label_col].apply(normalize_label)
-
         df = df[df[text_col].str.len() > 3]
 
         st.subheader("Distribusi Data Asli")
@@ -140,8 +134,7 @@ elif menu == "✍️ Prediksi Kalimat":
         else:
             model = joblib.load("model/model.pkl")
             tfidf = joblib.load("model/tfidf.pkl")
-            clean = clean_text(text)
-            pred = model.predict(tfidf.transform([clean]))[0]
+            pred = model.predict(tfidf.transform([clean_text(text)]))[0]
             st.success(pred)
 
 # ================== DASHBOARD ==================
@@ -149,36 +142,37 @@ elif menu == "📊 Dashboard":
     if "df" not in st.session_state:
         st.warning("Upload dataset dulu")
     else:
-        st.dataframe(
-            st.session_state.df[
-                [st.session_state.text_col, st.session_state.label_col]
-            ]
-        )
+        df = st.session_state.df
+        label_col = st.session_state.label_col
+
+        st.dataframe(df[[st.session_state.text_col, label_col]])
+
+        st.subheader("Distribusi Sentimen")
+        counts = df[label_col].value_counts()
+
+        fig, ax = plt.subplots()
+        counts.plot(kind="bar", ax=ax)
+        st.pyplot(fig)
 
 # ================== DOWNLOAD ==================
 elif menu == "⬇️ Download":
     if "df" in st.session_state:
         csv = st.session_state.df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "📥 Download CSV",
-            csv,
-            "hasil_sentimen.csv",
-            "text/csv"
-        )
-        
-# ================== MENU SETTING GRAFIK ==================
+        st.download_button("📥 Download CSV", csv, "hasil_sentimen.csv", "text/csv")
+
+# ================== SETTING GRAFIK ==================
 elif menu == "⚙️ Pengaturan Grafik":
     if "df" not in st.session_state:
         st.warning("Belum ada data")
     else:
-        chart_type = st.selectbox("Pilih Jenis Chart", ["Bar","Pie"])
-        data = st.session_state.df["sentiment"].value_counts()
+        chart_type = st.selectbox("Pilih Jenis Chart", ["Bar", "Pie"])
+        data = st.session_state.df[st.session_state.label_col].value_counts()
 
         fig, ax = plt.subplots()
         if chart_type == "Bar":
             data.plot(kind="bar", ax=ax)
         else:
             data.plot(kind="pie", autopct="%1.1f%%", ax=ax)
+            ax.set_ylabel("")
 
         st.pyplot(fig)
-gaturan Grafik"
