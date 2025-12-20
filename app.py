@@ -33,37 +33,38 @@ def clean_text(text):
     return " ".join(tokens)
 
 # ================== RULE-BASED SENTIMENT ==================
-POSITIVE_WORDS = [
-    "bagus","baik","mantap","puas","membantu","cepat","mudah",
-    "lancar","aman","rekomendasi","recommended","bermanfaat"
-]
-
-NEGATIVE_WORDS = [
-    "buruk","jelek","parah","kecewa","lama","error","gagal",
-    "ribet","susah","tidak","nggak","penipu","ditolak",
-    "pending","limit","verifikasi","masalah","bohong"
-]
-
 def rule_based_sentiment(text):
     text = str(text).lower()
 
-    pos_score = 0
-    neg_score = 0
+    # pola keluhan (NEGATIF KUAT)
+    negative_patterns = [
+        "tidak bisa", "tidak dapat", "tidak berhasil",
+        "gagal", "ditolak", "error", "masalah",
+        "verifikasi lama", "limit tidak", "tidak masuk",
+        "susah", "ribet", "kecewa", "parah"
+    ]
 
-    for w in POSITIVE_WORDS:
-        if w in text:
-            pos_score += 1
+    # pola kepuasan (POSITIF KUAT)
+    positive_patterns = [
+        "sangat membantu", "sangat puas", "mudah digunakan",
+        "cepat", "lancar", "berfungsi dengan baik",
+        "tidak ada masalah", "mantap", "bagus"
+    ]
 
-    for w in NEGATIVE_WORDS:
-        if w in text:
-            neg_score += 1
+    for p in negative_patterns:
+        if p in text:
+            return "Negatif"
 
-    if pos_score > neg_score:
-        return "Positif"
-    elif neg_score > pos_score:
+    for p in positive_patterns:
+        if p in text:
+            return "Positif"
+
+    # fallback logis (BUKAN RANDOM)
+    if any(k in text for k in ["tidak", "nggak", "belum"]):
         return "Negatif"
-    else:
-        return "Netral"
+
+    return "Netral"
+
 
 # ================== NORMALISASI LABEL ==================
 def normalize_label(x):
