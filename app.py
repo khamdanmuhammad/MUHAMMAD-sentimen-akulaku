@@ -13,37 +13,6 @@ from sklearn.naive_bayes import MultinomialNB
 # ================== KONFIG ==================
 st.set_page_config(page_title="Analisis Sentimen Akulaku", layout="wide")
 
-# ================== CSS ==================
-st.markdown("""
-<style>
-.card {background:white;padding:20px;border-radius:14px;
-box-shadow:0 4px 10px rgba(0,0,0,.08);margin-bottom:20px}
-.pos{color:#16a34a;font-size:22px;font-weight:bold}
-.net{color:#6b7280;font-size:22px;font-weight:bold}
-.neg{color:#dc2626;font-size:22px;font-weight:bold}
-</style>
-""", unsafe_allow_html=True)
-
-# ================== HEADER ==================
-st.markdown("""
-<div class="card">
-<h1>📊 Sistem Analisis Sentimen Akulaku</h1>
-<p>Upload • Training • Prediksi • Dashboard • Download</p>
-</div>
-""", unsafe_allow_html=True)
-
-# ================== MENU ==================
-menu = st.sidebar.selectbox(
-    "📌 Menu",
-    [
-        "📂 Upload Dataset",
-        "✍️ Prediksi Kalimat",
-        "📊 Dashboard",
-        "⬇️ Download Hasil",
-        "⚙️ Pengaturan Grafik"
-    ]
-)
-
 # ================== NLTK ==================
 try:
     nltk.data.find("corpora/stopwords")
@@ -52,103 +21,144 @@ except LookupError:
 
 stop_words = set(stopwords.words("indonesian"))
 
-# ================== CLEAN ==================
+# ================== CLEAN TEXT (AMAN) ==================
 def clean_text(text):
-    text = str(text).lower()
-    text = re.sub(r"http\S+|www\S+", "", text)
-    text = re.sub(r"[^a-z\s]", "", text)
-    return " ".join([w for w in text.split() if w not in stop_words])
+    if pd.isna(text):
+        return ""
 
-# ================== RULE BASED ==================
-NEGATIVE_WORDS = ["bajingan","jelek","buruk","penipu","parah","sampah","kecewa"]
-POSITIVE_WORDS = ["bagus","mantap","baik","membantu","recommended","puas"]
-
-def rule_based_sentiment(text):
     text = text.lower()
-    for w in NEGATIVE_WORDS:
-        if w in text:
-            return "Negatif"
-    for w in POSITIVE_WORDS:
-        if w in text:
+    text = re.sub(r"http\S+|www\S+", "", text)
+    text = re.sub(r"[^a-zA-Z\s]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+
+    tokens = [
+        w for w in text.split()
+        if w not in stop_words and len(w) > 2
+    ]
+    return " ".join(tokens)
+
+# ================== NORMALISASI LABEL ==================
+def normalize_label(x):
+    if isinstance(x, str):
+        x = x.lower()
+        if "pos" in x:
             return "Positif"
+        if "neg" in x:
+            return "Negatif"
+        if "net" in x:
+            return "Netral"
     return "Netral"
+
+# ================== DETEKSI KOLOM ==================
+def detect_column(df, keywords):
+    for col in df.columns:
+        for k in keywords:
+            if k in col.lower():
+                return col
+    return None
 
 # ================== LOAD CSV ==================
 def load_csv_safe(file):
-    for enc in ["utf-8","latin1","ISO-8859-1"]:
+    for enc in ["utf-8", "latin1", "ISO-8859-1"]:
         try:
             return pd.read_csv(file, encoding=enc)
         except:
-            pass
+            continue
     return None
 
-# ================== TRAIN ==================
-def train_model(df):
-    tfidf = TfidfVectorizer(max_features=3000)
-    X = tfidf.fit_transform(df["clean"])
-    y = df["sentiment"]
+# ================== TRAIN MODEL ==================
+def train_model(df, text_col, label_col):
+    vectorizer = TfidfVectorizer(
+        ngram_range=(1, 2),
+        max_features=15000
+    )
 
-    model = MultinomialNB()
+    X = vectorizer.fit_transform(df[text_col])
+    y = df[label_col]
+
+    model = MultinomialNB(alpha=0.5)
     model.fit(X, y)
 
     os.makedirs("model", exist_ok=True)
     joblib.dump(model, "model/model.pkl")
-    joblib.dump(tfidf, "model/tfidf.pkl")
+    joblib.dump(vectorizer, "model/tfidf.pkl")
 
-# ================== PREDIKSI ==================
-def predict_safe(text):
-    if os.path.exists("model/model.pkl"):
-        model = joblib.load("model/model.pkl")
-        tfidf = joblib.load("model/tfidf.pkl")
-        return model.predict(tfidf.transform([clean_text(text)]))[0]
-    return rule_based_sentiment(text)
+# ================== STREAMLIT UI ==================
+st.title("📊 Sistem Analisis Sentimen Akulaku")
 
-# ================== MENU UPLOAD ==================
+menu = st.sidebar.selectbox(
+    "📌 Menu",
+    ["📂 Upload Dataset", "✍️ Prediksi Kalimat", "📊 Dashboard", "⬇️ Download", "⚙️ Pengaturan Grafik"]
+)
+
+# ================== UPLOAD DATASET ==================
 if menu == "📂 Upload Dataset":
     file = st.file_uploader("Upload CSV", type=["csv"])
     if file:
         df = load_csv_safe(file)
-        if df is not None:
-            text_col = df.columns[0]
-            df["clean"] = df[text_col].astype(str).apply(clean_text)
-            df["sentiment"] = df[text_col].astype(str).apply(rule_based_sentiment)
 
-            train_model(df)
+        if df is None:
+            st.error("Gagal membaca file CSV")
+            st.stop()
 
-            st.session_state.df = df
-            st.session_state.text_col = text_col
-            st.success("✅ Dataset & model siap")
+        text_col = detect_column(df, ["review", "ulasan", "komentar", "content", "text"])
+        label_col = detect_column(df, ["sentiment", "label", "polarity"])
 
-# ================== MENU PREDIKSI ==================
+        if text_col is None or label_col is None:
+            st.error("Kolom teks atau label tidak ditemukan")
+            st.stop()
+
+        df[text_col] = df[text_col].apply(clean_text)
+        df[label_col] = df[label_col].apply(normalize_label)
+
+        df = df[df[text_col].str.len() > 3]
+
+        st.subheader("Distribusi Data Asli")
+        st.bar_chart(df[label_col].value_counts())
+
+        train_model(df, text_col, label_col)
+
+        st.session_state.df = df
+        st.session_state.text_col = text_col
+        st.session_state.label_col = label_col
+
+        st.success("✅ Dataset & model berhasil dilatih")
+
+# ================== PREDIKSI ==================
 elif menu == "✍️ Prediksi Kalimat":
     text = st.text_area("Masukkan ulasan")
     if st.button("Analisis"):
-        st.success(predict_safe(text))
+        if not os.path.exists("model/model.pkl"):
+            st.error("Model belum dilatih")
+        else:
+            model = joblib.load("model/model.pkl")
+            tfidf = joblib.load("model/tfidf.pkl")
+            clean = clean_text(text)
+            pred = model.predict(tfidf.transform([clean]))[0]
+            st.success(pred)
 
-# ================== MENU DASHBOARD ==================
+# ================== DASHBOARD ==================
 elif menu == "📊 Dashboard":
     if "df" not in st.session_state:
         st.warning("Upload dataset dulu")
     else:
-        df = st.session_state.df
-        st.dataframe(df[[st.session_state.text_col,"sentiment"]])
+        st.dataframe(
+            st.session_state.df[
+                [st.session_state.text_col, st.session_state.label_col]
+            ]
+        )
 
-# ================== MENU DOWNLOAD ==================
-elif menu == "⬇️ Download Hasil":
+# ================== DOWNLOAD ==================
+elif menu == "⬇️ Download":
     if "df" in st.session_state:
-        csv = st.session_state.df[
-            [st.session_state.text_col,"sentiment"]
-        ].to_csv(index=False).encode("utf-8")
-
+        csv = st.session_state.df.to_csv(index=False).encode("utf-8")
         st.download_button(
             "📥 Download CSV",
             csv,
             "hasil_sentimen.csv",
             "text/csv"
         )
-    else:
-        st.warning("Belum ada data")
-
+        
 # ================== MENU SETTING GRAFIK ==================
 elif menu == "⚙️ Pengaturan Grafik":
     if "df" not in st.session_state:
@@ -164,3 +174,4 @@ elif menu == "⚙️ Pengaturan Grafik":
             data.plot(kind="pie", autopct="%1.1f%%", ax=ax)
 
         st.pyplot(fig)
+gaturan Grafik"
