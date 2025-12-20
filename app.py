@@ -145,6 +145,8 @@ if menu == "📂 Upload Dataset":
         if label_col is None:
             st.warning("Kolom label tidak ditemukan → label dibuat otomatis (rule-based)")
             df["sentiment"] = df[text_col].astype(str).apply(rule_based_sentiment)
+            st.write("Contoh 20 label pertama:", df[["sentiment"]].head(20))
+
             label_col = "sentiment"
 
         # Preprocessing
