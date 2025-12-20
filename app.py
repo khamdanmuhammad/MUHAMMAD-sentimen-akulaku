@@ -88,8 +88,15 @@ st.title("📊 Sistem Analisis Sentimen Akulaku")
 
 menu = st.sidebar.selectbox(
     "📌 Menu",
-    ["📂 Upload Dataset", "✍️ Prediksi Kalimat", "📊 Dashboard", "⬇️ Download", "⚙️ Pengaturan Grafik"]
+    [
+        "📂 Upload Dataset",
+        "✍️ Prediksi Kalimat",
+        "📊 Dashboard",
+        "⬇️ Download",
+        "⚙️ Pengaturan Grafik"
+    ]
 )
+
 
 # ================== UPLOAD DATASET ==================
 if menu == "📂 Upload Dataset":
