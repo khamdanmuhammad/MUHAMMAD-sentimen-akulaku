@@ -33,18 +33,37 @@ def clean_text(text):
     return " ".join(tokens)
 
 # ================== RULE-BASED SENTIMENT ==================
-POSITIVE_WORDS = ["bagus", "mantap", "baik", "puas", "recommended", "cepat"]
-NEGATIVE_WORDS = ["buruk", "jelek", "parah", "kecewa", "lama", "error", "penipu"]
+POSITIVE_WORDS = [
+    "bagus","baik","mantap","puas","membantu","cepat","mudah",
+    "lancar","aman","rekomendasi","recommended","bermanfaat"
+]
+
+NEGATIVE_WORDS = [
+    "buruk","jelek","parah","kecewa","lama","error","gagal",
+    "ribet","susah","tidak","nggak","penipu","ditolak",
+    "pending","limit","verifikasi","masalah","bohong"
+]
 
 def rule_based_sentiment(text):
     text = str(text).lower()
-    for w in NEGATIVE_WORDS:
-        if w in text:
-            return "Negatif"
+
+    pos_score = 0
+    neg_score = 0
+
     for w in POSITIVE_WORDS:
         if w in text:
-            return "Positif"
-    return "Netral"
+            pos_score += 1
+
+    for w in NEGATIVE_WORDS:
+        if w in text:
+            neg_score += 1
+
+    if pos_score > neg_score:
+        return "Positif"
+    elif neg_score > pos_score:
+        return "Negatif"
+    else:
+        return "Netral"
 
 # ================== NORMALISASI LABEL ==================
 def normalize_label(x):
