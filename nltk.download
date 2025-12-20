@@ -4,5 +4,3 @@ try:
     nltk.data.find("corpora/stopwords")
 except LookupError:
     nltk.download("stopwords")
-
-stop_words = set(stopwords.words("indonesian"))
