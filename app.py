@@ -138,47 +138,14 @@ if menu == "📂 Upload Dataset":
         # Deteksi kolom teks
         text_col = detect_column(df, ["review", "ulasan", "komentar", "content", "text"])
         if text_col is None:
-            text_col = df.columns[0]  # fallback aman
-       # Deteksi / buat label
-label_col = detect_column(df, ["sentiment", "label", "polarity"])
-if label_col is None:
-    st.warning("Kolom label tidak ditemukan → label dibuat otomatis (rule-based)")
-    df["sentiment"] = df[text_col].astype(str).apply(rule_based_sentiment)
+            text_col = df.columns[0]
 
-    # BARIS DEBUG (AMAN)
-    st.write("Contoh 20 label pertama:", df[["sentiment"]].head(20))
-
-    label_col = "sentiment"
-
-    text = str(text).lower()
-
-    # indikator keluhan sistem (negatif dominan)
-    negative_indicators = [
-        "tidak bisa", "tidak dapat", "tidak masuk",
-        "gagal", "error", "ditolak", "limit tidak",
-        "verifikasi lama", "pending", "bermasalah",
-        "susah", "ribet", "kecewa", "penipu"
-    ]
-
-    # indikator kepuasan eksplisit
-    positive_indicators = [
-        "membantu", "mudah", "cepat",
-        "lancar", "bagus", "mantap",
-        "puas", "berfungsi dengan baik"
-    ]
-
-    for n in negative_indicators:
-        if n in text:
-            return "Negatif"
-
-    for p in positive_indicators:
-        if p in text:
-            return "Positif"
-
-    # default: keluhan implisit dianggap negatif
-    return "Negatif"
-
-
+        # Deteksi / buat label
+        label_col = detect_column(df, ["sentiment", "label", "polarity"])
+        if label_col is None:
+            st.warning("Kolom label tidak ditemukan → label dibuat otomatis (rule-based)")
+            df["sentiment"] = df[text_col].astype(str).apply(rule_based_sentiment)
+            st.write("Contoh 20 label pertama:", df[["sentiment"]].head(20))
             label_col = "sentiment"
 
         # Preprocessing
@@ -197,6 +164,7 @@ if label_col is None:
 
         st.success("✅ Dataset berhasil diproses & model dilatih")
 
+    
 # ================== PREDIKSI ==================
 elif menu == "✍️ Prediksi Kalimat":
     text = st.text_area("Masukkan ulasan")
