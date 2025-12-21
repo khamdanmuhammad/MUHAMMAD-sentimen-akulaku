@@ -11,7 +11,25 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 
 # ================== KONFIG ==================
-st.set_page_config(page_title="Analisis Sentimen Akulaku", layout="wide")
+st.set_page_config(
+    page_title="Analisis Sentimen Akulaku",
+    layout="wide"
+)
+
+# ================== STYLE ==================
+st.markdown("""
+<style>
+.main {background-color: #f8fafc;}
+h1, h2, h3 {color: #0f172a;}
+.stButton>button {
+    background-color: #2563eb;
+    color: white;
+    border-radius: 8px;
+    padding: 0.6em 1.2em;
+}
+.stTextArea textarea {border-radius: 10px;}
+</style>
+""", unsafe_allow_html=True)
 
 # ================== NLTK ==================
 try:
@@ -25,46 +43,36 @@ stop_words = set(stopwords.words("indonesian"))
 def clean_text(text):
     if pd.isna(text):
         return ""
-    text = text.lower()
+    text = str(text).lower()
     text = re.sub(r"http\S+|www\S+", "", text)
     text = re.sub(r"[^a-zA-Z\s]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     tokens = [w for w in text.split() if w not in stop_words and len(w) > 2]
     return " ".join(tokens)
 
-# ================== RULE-BASED SENTIMENT ==================
+# ================== RULE-BASED (PRIORITAS) ==================
+NEGATIVE_STRONG = [
+    "anjing","bangsat","kontol","tai","bajingan","penipu",
+    "tidak bisa","gagal","error","ditolak","parah",
+    "kecewa","ribet","susah","bohong","limit tidak",
+    "verifikasi lama","tidak masuk","pending"
+]
+
+POSITIVE_STRONG = [
+    "bagus","mantap","puas","membantu","cepat",
+    "mudah","lancar","recommended","rekomendasi",
+    "berfungsi dengan baik","sangat puas"
+]
+
 def rule_based_sentiment(text):
     text = str(text).lower()
-
-    # pola keluhan (NEGATIF KUAT)
-    negative_patterns = [
-        "tidak bisa", "tidak dapat", "tidak berhasil",
-        "gagal", "ditolak", "error", "masalah",
-        "verifikasi lama", "limit tidak", "tidak masuk",
-        "susah", "ribet", "kecewa", "parah"
-    ]
-
-    # pola kepuasan (POSITIF KUAT)
-    positive_patterns = [
-        "sangat membantu", "sangat puas", "mudah digunakan",
-        "cepat", "lancar", "berfungsi dengan baik",
-        "tidak ada masalah", "mantap", "bagus"
-    ]
-
-    for p in negative_patterns:
-        if p in text:
+    for w in NEGATIVE_STRONG:
+        if w in text:
             return "Negatif"
-
-    for p in positive_patterns:
-        if p in text:
+    for w in POSITIVE_STRONG:
+        if w in text:
             return "Positif"
-
-    # fallback logis (BUKAN RANDOM)
-    if any(k in text for k in ["tidak", "nggak", "belum"]):
-        return "Negatif"
-
-    return "Netral"
-
+    return None  # lanjut ke ML
 
 # ================== NORMALISASI LABEL ==================
 def normalize_label(x):
@@ -78,7 +86,7 @@ def normalize_label(x):
             return "Netral"
     return "Netral"
 
-# ================== DETEKSI KOLOM ==================
+# ================== UTIL ==================
 def detect_column(df, keywords):
     for col in df.columns:
         for k in keywords:
@@ -86,7 +94,6 @@ def detect_column(df, keywords):
                 return col
     return None
 
-# ================== LOAD CSV ==================
 def load_csv_safe(file):
     for enc in ["utf-8", "latin1", "ISO-8859-1"]:
         try:
@@ -120,8 +127,7 @@ menu = st.sidebar.selectbox(
         "📂 Upload Dataset",
         "✍️ Prediksi Kalimat",
         "📊 Dashboard",
-        "⬇️ Download",
-        "⚙️ Pengaturan Grafik"
+        "⬇️ Download"
     ]
 )
 
@@ -130,25 +136,21 @@ if menu == "📂 Upload Dataset":
     file = st.file_uploader("Upload CSV", type=["csv"])
     if file:
         df = load_csv_safe(file)
-
         if df is None:
             st.error("Gagal membaca file CSV")
             st.stop()
 
-        # Deteksi kolom teks
         text_col = detect_column(df, ["review", "ulasan", "komentar", "content", "text"])
         if text_col is None:
             text_col = df.columns[0]
 
-        # Deteksi / buat label
         label_col = detect_column(df, ["sentiment", "label", "polarity"])
         if label_col is None:
             st.warning("Kolom label tidak ditemukan → label dibuat otomatis (rule-based)")
             df["sentiment"] = df[text_col].astype(str).apply(rule_based_sentiment)
-            st.write("Contoh 20 label pertama:", df[["sentiment"]].head(20))
+            df["sentiment"] = df["sentiment"].fillna("Netral")
             label_col = "sentiment"
 
-        # Preprocessing
         df[text_col] = df[text_col].apply(clean_text)
         df[label_col] = df[label_col].apply(normalize_label)
         df = df[df[text_col].str.len() > 3]
@@ -164,18 +166,41 @@ if menu == "📂 Upload Dataset":
 
         st.success("✅ Dataset berhasil diproses & model dilatih")
 
-    
-# ================== PREDIKSI ==================
+# ================== PREDIKSI KALIMAT ==================
 elif menu == "✍️ Prediksi Kalimat":
-    text = st.text_area("Masukkan ulasan")
-    if st.button("Analisis"):
-        if not os.path.exists("model/model.pkl"):
+    st.subheader("✍️ Prediksi Sentimen Kalimat")
+
+    text = st.text_area(
+        "Masukkan ulasan",
+        placeholder="Contoh: aplikasi ini parah, verifikasi lama dan error terus",
+        height=120
+    )
+
+    if st.button("🔍 Analisis Sentimen"):
+        if not text.strip():
+            st.warning("Teks tidak boleh kosong")
+        elif not os.path.exists("model/model.pkl"):
             st.error("Model belum dilatih")
         else:
-            model = joblib.load("model/model.pkl")
-            tfidf = joblib.load("model/tfidf.pkl")
-            pred = model.predict(tfidf.transform([clean_text(text)]))[0]
-            st.success(pred)
+            rule_result = rule_based_sentiment(text)
+
+            if rule_result is not None:
+                final_result = rule_result
+                source = "Rule-Based"
+            else:
+                model = joblib.load("model/model.pkl")
+                tfidf = joblib.load("model/tfidf.pkl")
+                final_result = model.predict(
+                    tfidf.transform([clean_text(text)])
+                )[0]
+                source = "Machine Learning"
+
+            if final_result == "Positif":
+                st.success(f"✅ Positif\n\nSumber: {source}")
+            elif final_result == "Negatif":
+                st.error(f"❌ Negatif\n\nSumber: {source}")
+            else:
+                st.info(f"ℹ️ Netral\n\nSumber: {source}")
 
 # ================== DASHBOARD ==================
 elif menu == "📊 Dashboard":
@@ -188,31 +213,17 @@ elif menu == "📊 Dashboard":
         st.dataframe(df[[st.session_state.text_col, label_col]])
 
         st.subheader("Distribusi Sentimen")
-        counts = df[label_col].value_counts()
-
         fig, ax = plt.subplots()
-        counts.plot(kind="bar", ax=ax)
+        df[label_col].value_counts().plot(kind="bar", ax=ax)
         st.pyplot(fig)
 
 # ================== DOWNLOAD ==================
 elif menu == "⬇️ Download":
     if "df" in st.session_state:
         csv = st.session_state.df.to_csv(index=False).encode("utf-8")
-        st.download_button("📥 Download CSV", csv, "hasil_sentimen.csv", "text/csv")
-
-# ================== SETTING GRAFIK ==================
-elif menu == "⚙️ Pengaturan Grafik":
-    if "df" not in st.session_state:
-        st.warning("Belum ada data")
-    else:
-        chart_type = st.selectbox("Pilih Jenis Chart", ["Bar", "Pie"])
-        data = st.session_state.df[st.session_state.label_col].value_counts()
-
-        fig, ax = plt.subplots()
-        if chart_type == "Bar":
-            data.plot(kind="bar", ax=ax)
-        else:
-            data.plot(kind="pie", autopct="%1.1f%%", ax=ax)
-            ax.set_ylabel("")
-
-        st.pyplot(fig)
+        st.download_button(
+            "📥 Download CSV",
+            csv,
+            "hasil_sentimen.csv",
+            "text/csv"
+        )
