@@ -139,11 +139,17 @@ if menu == "📂 Upload Dataset":
         text_col = detect_column(df, ["review", "ulasan", "komentar", "content", "text"])
         if text_col is None:
             text_col = df.columns[0]  # fallback aman
+       # Deteksi / buat label
+label_col = detect_column(df, ["sentiment", "label", "polarity"])
+if label_col is None:
+    st.warning("Kolom label tidak ditemukan → label dibuat otomatis (rule-based)")
+    df["sentiment"] = df[text_col].astype(str).apply(rule_based_sentiment)
 
-        # Deteksi / buat label
-        label_col = detect_column(df, ["sentiment", "label", "polarity"])
-        if label_col is None:
-            def rule_based_sentiment(text):
+    # BARIS DEBUG (AMAN)
+    st.write("Contoh 20 label pertama:", df[["sentiment"]].head(20))
+
+    label_col = "sentiment"
+
     text = str(text).lower()
 
     # indikator keluhan sistem (negatif dominan)
