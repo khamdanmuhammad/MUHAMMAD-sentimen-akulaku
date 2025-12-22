@@ -43,7 +43,6 @@ try:
     nltk.data.find("corpora/stopwords")
 except LookupError:
     nltk.download("stopwords")
-
 stop_words = set(stopwords.words("indonesian"))
 
 # ================== CLEAN TEXT ==================
@@ -58,16 +57,16 @@ def clean_text(text):
     return " ".join(tokens)
 
 # ================== RULE BASED ==================
-NEGATIVE_STRONG = ["gagal","error","parah","kecewa","bohong","pending"]
-POSITIVE_STRONG = ["bagus","mantap","puas","mudah","cepat","rekomendasi"]
+NEGATIVE = ["gagal","error","parah","kecewa","bohong","pending"]
+POSITIVE = ["bagus","mantap","puas","mudah","cepat","rekomendasi"]
 
 def rule_based_sentiment(text):
-    text = str(text).lower()
-    for w in NEGATIVE_STRONG:
-        if w in text:
+    t = str(text).lower()
+    for w in NEGATIVE:
+        if w in t:
             return "Negatif"
-    for w in POSITIVE_STRONG:
-        if w in text:
+    for w in POSITIVE:
+        if w in t:
             return "Positif"
     return "Netral"
 
@@ -80,14 +79,14 @@ def detect_column(df, keywords):
     return None
 
 def load_csv_safe(file):
-    for enc in ["utf-8", "latin1", "ISO-8859-1"]:
+    for enc in ["utf-8","latin1","ISO-8859-1"]:
         try:
             return pd.read_csv(file, encoding=enc)
         except:
             continue
     return None
 
-# ================== INIT SESSION STATE (ANTI ERROR) ==================
+# ================== SESSION STATE (ANTI ERROR) ==================
 if "df" not in st.session_state:
     st.session_state.df = None
 if "text_col" not in st.session_state:
@@ -105,7 +104,7 @@ menu = st.sidebar.selectbox(
 
 # ================== UPLOAD ==================
 if menu == "📂 Upload Dataset":
-    file = st.file_uploader("Upload CSV", type=["csv"])
+    file = st.file_uploader("Upload file CSV", type=["csv"])
     if file:
         df = load_csv_safe(file)
         if df is None:
@@ -134,7 +133,7 @@ elif menu == "✍️ Prediksi Kalimat":
         else:
             st.success(f"Hasil: {rule_based_sentiment(text)}")
 
-# ================== DASHBOARD ==================
+# ================== DASHBOARD (LENGKAP 3 GRAFIK) ==================
 elif menu == "📊 Dashboard":
     if st.session_state.df is None:
         st.warning("Upload dataset terlebih dahulu")
@@ -142,13 +141,50 @@ elif menu == "📊 Dashboard":
         df = st.session_state.df
         label_col = st.session_state.label_col
 
-        st.subheader("Distribusi Sentimen")
         counts = df[label_col].value_counts()
+        for k in ["Positif","Negatif","Netral"]:
+            if k not in counts:
+                counts[k] = 0
 
-        fig, ax = plt.subplots()
-        counts.plot(kind="bar", ax=ax, color=["#2563eb","#dc2626","#facc15"])
-        st.pyplot(fig)
+        col1, col2, col3 = st.columns(3)
 
+        # 1️⃣ Bar chart
+        with col1:
+            fig1, ax1 = plt.subplots()
+            counts.loc[["Positif","Negatif","Netral"]].plot(
+                kind="bar",
+                ax=ax1,
+                color=["green","red","gold"]
+            )
+            ax1.set_title("Jumlah Review per Sentimen")
+            st.pyplot(fig1)
+
+        # 2️⃣ Pie chart
+        with col2:
+            fig2, ax2 = plt.subplots()
+            ax2.pie(
+                counts.loc[["Positif","Negatif","Netral"]],
+                labels=["positive","negative","neutral"],
+                autopct="%1.1f%%",
+                startangle=90,
+                colors=["green","red","gold"]
+            )
+            ax2.set_title("Persentase Sentimen")
+            st.pyplot(fig2)
+
+        # 3️⃣ Distribusi rating
+        with col3:
+            rating_col = detect_column(df, ["rating","score","bintang"])
+            if rating_col is None:
+                st.info("Kolom rating tidak tersedia")
+            else:
+                fig3, ax3 = plt.subplots()
+                grp = df.groupby([rating_col, label_col]).size().unstack(fill_value=0)
+                grp.plot(kind="bar", ax=ax3)
+                ax3.set_title("Distribusi Rating per Sentimen")
+                st.pyplot(fig3)
+
+        st.subheader("=== LABELING SENTIMEN ===")
         st.dataframe(df)
 
 # ================== MODELING ==================
