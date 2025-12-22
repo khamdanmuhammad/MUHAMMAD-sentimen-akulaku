@@ -50,15 +50,13 @@ def clean_text(text):
     tokens = [w for w in text.split() if w not in stop_words and len(w) > 2]
     return " ".join(tokens)
 
-# ================== KAMUS SENTIMEN ==================
+# ================== KAMUS SENTIMEN (UNTUK PREDIKSI TEKS) ==================
 NEGATIVE_WORDS = [
     "kecewa","buruk","jelek","lambat","ribet","error","parah","mengecewakan",
     "anjing","bangsat","kontol","tai","bajingan","penipu","tolol","bodoh","goblok"
 ]
 
-NEUTRAL_WORDS = [
-    "lumayan","biasa","cukup","standar","oke"
-]
+NEUTRAL_WORDS = ["lumayan","biasa","cukup","standar","oke"]
 
 POSITIVE_WORDS = [
     "bagus","baik","mantap","membantu","recommended","good","suka","cepat","aman"
@@ -67,7 +65,6 @@ POSITIVE_WORDS = [
 # ================== RATING OTOMATIS ==================
 def auto_rating_from_text(text):
     text = text.lower()
-
     if any(w in text for w in NEGATIVE_WORDS):
         return 1
     elif any(w in text for w in NEUTRAL_WORDS):
@@ -78,6 +75,11 @@ def auto_rating_from_text(text):
         return 3
 
 def sentiment_from_rating(rating):
+    try:
+        rating = int(rating)
+    except:
+        return "Netral"
+
     if rating <= 2:
         return "Negatif"
     elif rating == 3:
@@ -94,26 +96,53 @@ st.title("📊 Sistem Analisis Sentimen Akulaku")
 
 menu = st.sidebar.selectbox(
     "📌 Menu",
-    ["📂 Upload Dataset", "✍️ Prediksi Kalimat", "📊 Dashboard", "🧠 Modeling & Evaluasi"]
+    [
+        "📂 Upload Dataset",
+        "✍️ Prediksi Kalimat",
+        "📊 Dashboard",
+        "🧠 Modeling & Evaluasi",
+        "⬇️ Download CSV"
+    ]
 )
 
-# ================== UPLOAD ==================
+# ================== UPLOAD DATASET ==================
 if menu == "📂 Upload Dataset":
     file = st.file_uploader("Upload CSV", type=["csv"])
     if file:
         df = pd.read_csv(file)
-        text_col = df.columns[0]
+
+        # Deteksi kolom teks & rating
+        text_col = None
+        rating_col = None
+
+        for col in df.columns:
+            if any(k in col.lower() for k in ["review", "ulasan", "content", "text"]):
+                text_col = col
+            if any(k in col.lower() for k in ["rating", "score", "bintang"]):
+                rating_col = col
+
+        if text_col is None:
+            text_col = df.columns[0]
 
         df["clean_text"] = df[text_col].apply(clean_text)
-        df["rating_auto"] = df["clean_text"].apply(auto_rating_from_text)
-        df["sentiment"] = df["rating_auto"].apply(sentiment_from_rating)
+
+        # ================== SENTIMEN SESUAI RATING CSV ==================
+        if rating_col is not None:
+            df[rating_col] = pd.to_numeric(df[rating_col], errors="coerce")
+            df["rating_auto"] = df[rating_col]
+            df["sentiment"] = df["rating_auto"].apply(sentiment_from_rating)
+
+        # ================== JIKA TIDAK ADA RATING ==================
+        else:
+            df["rating_auto"] = df["clean_text"].apply(auto_rating_from_text)
+            df["sentiment"] = df["rating_auto"].apply(sentiment_from_rating)
 
         st.session_state.df = df
 
-        st.success("✅ Dataset berhasil diproses otomatis")
+        st.success("✅ Dataset berhasil diproses sesuai skor")
         st.dataframe(df.head())
 
-# ================== PREDIKSI ==================
+# ================== PREDIKSI KALIMAT ==================
 elif menu == "✍️ Prediksi Kalimat":
     text = st.text_area("Masukkan ulasan")
 
@@ -141,6 +170,7 @@ elif menu == "📊 Dashboard":
 
         fig, ax = plt.subplots()
         counts.plot(kind="bar", ax=ax)
+        ax.set_title("Distribusi Sentimen")
         st.pyplot(fig)
 
         st.dataframe(df)
@@ -168,5 +198,18 @@ elif menu == "🧠 Modeling & Evaluasi":
 
         y_pred = model.predict(X_test_vec)
 
-        st.success(f"Akurasi: {accuracy_score(y_test,y_pred):.4f}")
-        st.text(classification_report(y_test,y_pred))
+        st.success(f"Akurasi: {accuracy_score(y_test, y_pred):.4f}")
+        st.text(classification_report(y_test, y_pred))
+
+# ================== DOWNLOAD CSV ==================
+elif menu == "⬇️ Download CSV":
+    if st.session_state.df is None:
+        st.warning("Belum ada dataset")
+    else:
+        csv = st.session_state.df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="⬇️ Download CSV Hasil Analisis",
+            data=csv,
+            file_name="hasil_analisis_sentimen_akulaku.csv",
+            mime="text/csv"
+        )
