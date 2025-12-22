@@ -21,71 +21,75 @@ st.markdown("""
 <style>
 /* ===== GLOBAL ===== */
 .stApp {
-    background: linear-gradient(135deg, #eef6ff, #fffdf2);
+    background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
     color: #000000;
     font-family: 'Segoe UI', sans-serif;
 }
 
 /* ===== SIDEBAR ===== */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #ffffff, #f1f5f9);
-    border-right: 1px solid #e5e7eb;
+    background: linear-gradient(180deg, #ffffff, #ecfdf5);
+    border-right: 1px solid #bbf7d0;
 }
 
+/* Semua teks sidebar tetap hitam */
 section[data-testid="stSidebar"] * {
     color: #000000 !important;
     font-weight: 500;
 }
 
-/* ===== SIDEBAR SELECTBOX ===== */
+/* ===== SELECTBOX MENU ===== */
 section[data-testid="stSidebar"] .stSelectbox > div {
-    border-radius: 14px;
     background-color: #ffffff;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    border-radius: 14px;
+    box-shadow: 0 6px 14px rgba(16, 185, 129, 0.15);
+    border: 1px solid #bbf7d0;
 }
 
-/* Dropdown item */
+/* ===== DROPDOWN ITEM ===== */
 section[data-testid="stSidebar"] ul {
     border-radius: 12px;
 }
 
-/* ===== ACTIVE ITEM ===== */
+/* ===== ITEM AKTIF ===== */
 section[data-testid="stSidebar"] li[aria-selected="true"] {
-    background: linear-gradient(135deg, #fde68a, #facc15);
+    background: linear-gradient(135deg, #86efac, #4ade80);
     border-radius: 10px;
     font-weight: 700;
 }
 
 /* ===== HOVER EFFECT ===== */
 section[data-testid="stSidebar"] li:hover {
-    background-color: #fef3c7;
+    background-color: #dcfce7;
     border-radius: 10px;
 }
 
 /* ===== BUTTON ===== */
 .stButton > button {
-    background: linear-gradient(135deg, #facc15, #eab308);
+    background: linear-gradient(135deg, #4ade80, #22c55e);
     color: #000000;
     border-radius: 14px;
     font-weight: 700;
     padding: 0.6em 1.4em;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    box-shadow: 0 6px 14px rgba(34, 197, 94, 0.25);
+    border: none;
 }
 
-/* ===== SUCCESS BOX ===== */
+/* ===== ALERT / SUCCESS ===== */
 div[data-testid="stAlert"] {
     border-radius: 14px;
     font-weight: 600;
+    border-left: 6px solid #22c55e;
 }
 
 /* ===== DATAFRAME ===== */
 .stDataFrame {
     border-radius: 14px;
     overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
 </style>
 """, unsafe_allow_html=True)
-
 
 # ================== NLTK ==================
 try:
