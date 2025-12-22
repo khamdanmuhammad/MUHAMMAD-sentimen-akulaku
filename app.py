@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
 
 # ================== KONFIG ==================
 st.set_page_config(
@@ -50,7 +52,7 @@ def clean_text(text):
     tokens = [w for w in text.split() if w not in stop_words and len(w) > 2]
     return " ".join(tokens)
 
-# ================== RULE-BASED (PRIORITAS) ==================
+# ================== RULE BASED ==================
 NEGATIVE_STRONG = [
     "anjing","bangsat","kontol","tai","bajingan","penipu",
     "tidak bisa","gagal","error","ditolak","parah",
@@ -72,7 +74,7 @@ def rule_based_sentiment(text):
     for w in POSITIVE_STRONG:
         if w in text:
             return "Positif"
-    return None  # lanjut ke ML
+    return None
 
 # ================== NORMALISASI LABEL ==================
 def normalize_label(x):
@@ -104,10 +106,7 @@ def load_csv_safe(file):
 
 # ================== TRAIN MODEL ==================
 def train_model(df, text_col, label_col):
-    vectorizer = TfidfVectorizer(
-        ngram_range=(1, 2),
-        max_features=15000
-    )
+    vectorizer = TfidfVectorizer(ngram_range=(1,2), max_features=15000)
     X = vectorizer.fit_transform(df[text_col])
     y = df[label_col]
 
@@ -127,36 +126,32 @@ menu = st.sidebar.selectbox(
         "📂 Upload Dataset",
         "✍️ Prediksi Kalimat",
         "📊 Dashboard",
+        "🧠 Modeling & Evaluasi",
         "⬇️ Download"
     ]
 )
 
 # ================== UPLOAD DATASET ==================
 if menu == "📂 Upload Dataset":
-    file = st.file_uploader("Upload CSV", type=["csv"])
+    file = st.file_uploader("Upload file CSV", type=["csv"])
     if file:
         df = load_csv_safe(file)
         if df is None:
-            st.error("Gagal membaca file CSV")
+            st.error("❌ Gagal membaca file CSV")
             st.stop()
 
-        text_col = detect_column(df, ["review", "ulasan", "komentar", "content", "text"])
+        text_col = detect_column(df, ["review","ulasan","content","text","komentar"])
         if text_col is None:
             text_col = df.columns[0]
 
-        label_col = detect_column(df, ["sentiment", "label", "polarity"])
+        label_col = detect_column(df, ["sentiment","label","polarity"])
         if label_col is None:
-            st.warning("Kolom label tidak ditemukan → label dibuat otomatis (rule-based)")
-            df["sentiment"] = df[text_col].astype(str).apply(rule_based_sentiment)
-            df["sentiment"] = df["sentiment"].fillna("Netral")
+            df["sentiment"] = df[text_col].apply(rule_based_sentiment).fillna("Netral")
             label_col = "sentiment"
 
         df[text_col] = df[text_col].apply(clean_text)
         df[label_col] = df[label_col].apply(normalize_label)
         df = df[df[text_col].str.len() > 3]
-
-        st.subheader("Distribusi Sentimen")
-        st.bar_chart(df[label_col].value_counts())
 
         train_model(df, text_col, label_col)
 
@@ -165,65 +160,79 @@ if menu == "📂 Upload Dataset":
         st.session_state.label_col = label_col
 
         st.success("✅ Dataset berhasil diproses & model dilatih")
+        st.bar_chart(df[label_col].value_counts())
 
-# ================== PREDIKSI KALIMAT ==================
+# ================== PREDIKSI ==================
 elif menu == "✍️ Prediksi Kalimat":
-    st.subheader("✍️ Prediksi Sentimen Kalimat")
+    st.subheader("✍️ Prediksi Sentimen")
 
-    text = st.text_area(
-        "Masukkan ulasan",
-        placeholder="Contoh: aplikasi ini parah, verifikasi lama dan error terus",
-        height=120
-    )
+    text = st.text_area("Masukkan ulasan", height=120)
 
-    if st.button("🔍 Analisis Sentimen"):
+    if st.button("🔍 Analisis"):
         if not text.strip():
-            st.warning("Teks tidak boleh kosong")
+            st.warning("⚠️ Teks kosong")
         elif not os.path.exists("model/model.pkl"):
-            st.error("Model belum dilatih")
+            st.error("⚠️ Model belum tersedia")
         else:
-            rule_result = rule_based_sentiment(text)
-
-            if rule_result is not None:
-                final_result = rule_result
-                source = "Rule-Based"
+            rule = rule_based_sentiment(text)
+            if rule:
+                st.success(f"Hasil: {rule} (Rule-Based)")
             else:
                 model = joblib.load("model/model.pkl")
                 tfidf = joblib.load("model/tfidf.pkl")
-                final_result = model.predict(
-                    tfidf.transform([clean_text(text)])
-                )[0]
-                source = "Machine Learning"
-
-            if final_result == "Positif":
-                st.success(f"✅ Positif\n\nSumber: {source}")
-            elif final_result == "Negatif":
-                st.error(f"❌ Negatif\n\nSumber: {source}")
-            else:
-                st.info(f"ℹ️ Netral\n\nSumber: {source}")
+                pred = model.predict(tfidf.transform([clean_text(text)]))[0]
+                st.success(f"Hasil: {pred} (Machine Learning)")
 
 # ================== DASHBOARD ==================
 elif menu == "📊 Dashboard":
     if "df" not in st.session_state:
-        st.warning("Upload dataset dulu")
+        st.warning("⚠️ Upload dataset terlebih dahulu")
+    else:
+        st.subheader("=== LABELING SENTIMEN ===")
+        df = st.session_state.df
+        st.dataframe(df, use_container_width=True)
+
+        st.subheader("📊 Distribusi Sentimen")
+        fig, ax = plt.subplots()
+        df[st.session_state.label_col].value_counts().plot(kind="bar", ax=ax)
+        st.pyplot(fig)
+
+# ================== MODELING & EVALUASI ==================
+elif menu == "🧠 Modeling & Evaluasi":
+    if "df" not in st.session_state:
+        st.warning("⚠️ Upload dataset terlebih dahulu")
     else:
         df = st.session_state.df
+        text_col = st.session_state.text_col
         label_col = st.session_state.label_col
 
-        st.dataframe(df[[st.session_state.text_col, label_col]])
+        X_train, X_test, y_train, y_test = train_test_split(
+            df[text_col], df[label_col],
+            test_size=0.2, random_state=42, stratify=df[label_col]
+        )
 
-        st.subheader("Distribusi Sentimen")
-        fig, ax = plt.subplots()
-        df[label_col].value_counts().plot(kind="bar", ax=ax)
-        st.pyplot(fig)
+        tfidf = TfidfVectorizer(ngram_range=(1,2), max_features=15000)
+        X_train_vec = tfidf.fit_transform(X_train)
+        X_test_vec = tfidf.transform(X_test)
+
+        model = MultinomialNB(alpha=0.5)
+        model.fit(X_train_vec, y_train)
+        y_pred = model.predict(X_test_vec)
+
+        acc = accuracy_score(y_test, y_pred)
+        st.success(f"🎯 Akurasi Model: {acc:.4f}")
+
+        st.text(classification_report(y_test, y_pred))
 
 # ================== DOWNLOAD ==================
 elif menu == "⬇️ Download":
-    if "df" in st.session_state:
+    if "df" not in st.session_state:
+        st.warning("⚠️ Tidak ada data untuk di-download")
+    else:
         csv = st.session_state.df.to_csv(index=False).encode("utf-8")
         st.download_button(
-            "📥 Download CSV",
+            "📥 Download CSV Hasil Sentimen",
             csv,
-            "hasil_sentimen.csv",
+            "hasil_sentimen_akulaku.csv",
             "text/csv"
         )
