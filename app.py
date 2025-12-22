@@ -24,8 +24,8 @@ st.markdown("""
 
 /* ===== Background utama ===== */
 .stApp {
-    background: linear-gradient(135deg, #e0f2fe 0%, #fffde7 50%, #e0f2fe 100%);
-    color: #0f172a;
+    background: linear-gradient(135deg, #e0f2fe 0%, #fefce8 55%, #fff7cc 100%);
+    color: #1e293b;
 }
 
 /* ===== Sidebar ===== */
@@ -33,7 +33,7 @@ section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #1e3a8a, #1e40af);
 }
 section[data-testid="stSidebar"] * {
-    color: #fffde7 !important;
+    color: #fffbea !important;
 }
 
 /* ===== Judul ===== */
@@ -42,24 +42,24 @@ h1 {
     font-weight: 800;
 }
 h2, h3 {
-    color: #1d4ed8;
+    color: #1e40af;
     font-weight: 700;
 }
 
-/* ===== Card-style container ===== */
+/* ===== Card / container ===== */
 div[data-testid="stVerticalBlock"],
 div[data-testid="stDataFrame"] {
     background-color: #ffffff;
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 14px;
-    box-shadow: 0 10px 28px rgba(30, 64, 175, 0.18);
+    box-shadow: 0 10px 28px rgba(30, 64, 175, 0.15);
 }
 
 /* ===== Button ===== */
 .stButton>button {
     background: linear-gradient(135deg, #facc15, #eab308);
-    color: #1e3a8a;
-    border-radius: 10px;
+    color: #1e293b;
+    border-radius: 12px;
     padding: 0.6em 1.4em;
     font-weight: 700;
     border: none;
@@ -73,7 +73,7 @@ div[data-testid="stDataFrame"] {
 /* ===== Input & textarea ===== */
 textarea, input {
     border-radius: 10px !important;
-    border: 1px solid #93c5fd !important;
+    border: 1px solid #fde68a !important;
 }
 
 /* ===== Alert ===== */
@@ -256,7 +256,7 @@ NEGATIVE : {counts['Negatif']:,} ({counts['Negatif']/total*100:.1f}%)
         fig, ax = plt.subplots()
         counts.loc[["Positif","Negatif","Netral"]].plot(
             kind="bar", ax=ax,
-            color=["#22c55e","#ef4444","#eab308"]
+            color=["#2563eb","#dc2626","#facc15"]
         )
         ax.set_title("Jumlah Review per Sentimen")
         st.pyplot(fig)
@@ -267,7 +267,7 @@ NEGATIVE : {counts['Negatif']:,} ({counts['Negatif']/total*100:.1f}%)
             counts.loc[["Positif","Negatif","Netral"]],
             labels=["positive","negative","neutral"],
             autopct="%1.1f%%",
-            colors=["#22c55e","#ef4444","#eab308"],
+            colors=["#2563eb","#dc2626","#facc15"],
             startangle=90
         )
         ax.set_title("Persentase Sentimen")
