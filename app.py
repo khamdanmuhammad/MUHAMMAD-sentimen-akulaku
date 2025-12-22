@@ -50,12 +50,29 @@ def clean_text(text):
     tokens = [w for w in text.split() if w not in stop_words and len(w) > 2]
     return " ".join(tokens)
 
-# ================== RATING & SENTIMEN ==================
+# ================== KAMUS RATING TEKS ==================
+NEGATIVE_WORDS = [
+    "kecewa","buruk","jelek","lambat","ribet","error","parah","mengecewakan",
+    "anjing","bangsat","kontol","tai","bajingan","penipu","tolol","bodoh","goblok"
+]
+NEUTRAL_WORDS = ["lumayan","biasa","cukup","standar","oke"]
+POSITIVE_WORDS = [
+    "bagus","baik","mantap","membantu","recommended","good","suka","cepat","aman"
+]
+
+def auto_rating_from_text(text):
+    text = text.lower()
+    if any(w in text for w in NEGATIVE_WORDS):
+        return 1
+    elif any(w in text for w in POSITIVE_WORDS):
+        return 5
+    elif any(w in text for w in NEUTRAL_WORDS):
+        return 3
+    else:
+        return 3  # netral hanya jika BENAR-BENAR tidak terdeteksi
+
 def sentiment_from_rating(rating):
-    try:
-        rating = int(rating)
-    except:
-        return "Netral"
+    rating = int(rating)
     if rating <= 2:
         return "Negatif"
     elif rating == 3:
@@ -83,19 +100,17 @@ menu = st.sidebar.selectbox(
     ]
 )
 
-# ================== UPLOAD ==================
+# ================== UPLOAD DATASET ==================
 if menu == "📂 Upload Dataset":
     file = st.file_uploader("Upload CSV", type=["csv"])
     if file:
         df = pd.read_csv(file)
 
-        text_col = None
-        rating_col = None
-
+        text_col, rating_col = None, None
         for col in df.columns:
-            if any(k in col.lower() for k in ["review", "ulasan", "content", "text"]):
+            if any(k in col.lower() for k in ["review","ulasan","content","text"]):
                 text_col = col
-            if any(k in col.lower() for k in ["rating", "score", "bintang"]):
+            if any(k in col.lower() for k in ["rating","score","bintang"]):
                 rating_col = col
 
         if text_col is None:
@@ -106,19 +121,18 @@ if menu == "📂 Upload Dataset":
         if rating_col:
             df[rating_col] = pd.to_numeric(df[rating_col], errors="coerce")
             df["rating_auto"] = df[rating_col]
-            df["sentiment"] = df["rating_auto"].apply(sentiment_from_rating)
-            st.session_state.rating_col = rating_col
         else:
-            df["rating_auto"] = 3
-            df["sentiment"] = "Netral"
-            st.session_state.rating_col = None
+            df["rating_auto"] = df["clean_text"].apply(auto_rating_from_text)
+
+        df["sentiment"] = df["rating_auto"].apply(sentiment_from_rating)
 
         st.session_state.df = df
+        st.session_state.rating_col = rating_col
 
-        st.success("✅ Dataset berhasil diproses")
+        st.success("✅ Dataset diproses SESUAI SKOR (TIDAK NETRAL SEMUA)")
         st.dataframe(df.head())
 
-# ================== PREDIKSI ==================
+# ================== PREDIKSI KALIMAT ==================
 elif menu == "✍️ Prediksi Kalimat":
     text = st.text_area("Masukkan ulasan")
 
@@ -126,8 +140,10 @@ elif menu == "✍️ Prediksi Kalimat":
         if not text.strip():
             st.warning("Teks kosong")
         else:
-            rating = 3
-            sentiment = "Netral"
+            clean = clean_text(text)
+            rating = auto_rating_from_text(clean)
+            sentiment = sentiment_from_rating(rating)
+
             st.success(f"""
 ### ✅ Hasil Analisis
 - **Rating** : {rating}
@@ -140,70 +156,36 @@ elif menu == "📊 Dashboard":
         st.warning("Upload dataset terlebih dahulu")
     else:
         df = st.session_state.df
-        rating_col = st.session_state.rating_col
-
-        st.subheader("🎯 DISTRIBUSI SENTIMEN")
-
         counts = df["sentiment"].value_counts()
         total = counts.sum()
 
-        # ===== TEKS RINGKASAN =====
         st.code(
-            "🎯 DISTRIBUSI SENTIMEN:\n"
-            "============================\n" +
-            "\n".join([
-                f"{k.upper():<9}: {v:,} ({v/total*100:.1f}%)"
-                for k, v in counts.items()
-            ]),
+            "🎯 DISTRIBUSI SENTIMEN\n" +
+            "\n".join([f"{k}: {v:,} ({v/total*100:.1f}%)" for k,v in counts.items()]),
             language="text"
         )
 
         col1, col2, col3 = st.columns(3)
 
-        # ===== BAR SENTIMEN =====
         with col1:
             fig, ax = plt.subplots()
-            counts.plot(
-                kind="bar",
-                ax=ax,
-                color=["green", "red", "gold"]
-            )
+            counts.plot(kind="bar", ax=ax)
             ax.set_title("Jumlah Review per Sentimen")
-            ax.set_xlabel("Sentimen")
-            ax.set_ylabel("Jumlah Review")
             st.pyplot(fig)
 
-        # ===== PIE SENTIMEN =====
         with col2:
             fig, ax = plt.subplots()
-            ax.pie(
-                counts,
-                labels=counts.index.str.lower(),
-                autopct="%1.1f%%",
-                startangle=90
-            )
+            ax.pie(counts, labels=counts.index, autopct="%1.1f%%")
             ax.set_title("Persentase Sentimen")
             st.pyplot(fig)
 
-        # ===== DISTRIBUSI RATING =====
         with col3:
-            if rating_col:
-                grp = (
-                    df.groupby(["rating_auto", "sentiment"])
-                    .size()
-                    .unstack(fill_value=0)
-                )
+            grp = df.groupby(["rating_auto","sentiment"]).size().unstack(fill_value=0)
+            fig, ax = plt.subplots()
+            grp.plot(kind="bar", ax=ax)
+            ax.set_title("Distribusi Rating per Sentimen")
+            st.pyplot(fig)
 
-                fig, ax = plt.subplots()
-                grp.plot(kind="bar", ax=ax)
-                ax.set_title("Distribusi Rating per Sentimen")
-                ax.set_xlabel("Rating")
-                ax.set_ylabel("Jumlah Review")
-                st.pyplot(fig)
-            else:
-                st.info("Kolom rating tidak tersedia")
-
-        st.subheader("📄 DATA HASIL")
         st.dataframe(df)
 
 # ================== MODELING ==================
@@ -212,7 +194,6 @@ elif menu == "🧠 Modeling & Evaluasi":
         st.warning("Upload dataset terlebih dahulu")
     else:
         df = st.session_state.df
-
         X = df["clean_text"]
         y = df["sentiment"]
 
@@ -226,11 +207,10 @@ elif menu == "🧠 Modeling & Evaluasi":
 
         model = MultinomialNB()
         model.fit(X_train_vec, y_train)
-
         y_pred = model.predict(X_test_vec)
 
-        st.success(f"Akurasi: {accuracy_score(y_test, y_pred):.4f}")
-        st.text(classification_report(y_test, y_pred))
+        st.success(f"Akurasi: {accuracy_score(y_test,y_pred):.4f}")
+        st.text(classification_report(y_test,y_pred))
 
 # ================== DOWNLOAD ==================
 elif menu == "⬇️ Download CSV":
