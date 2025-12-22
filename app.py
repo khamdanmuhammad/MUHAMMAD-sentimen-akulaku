@@ -21,10 +21,6 @@ st.markdown("""
 <style>
 .stApp {
     background: linear-gradient(135deg, #e0f2fe, #fefce8);
-    color: #1e293b;
-}
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #1e3a8a, #1e40af);
 }
 .stButton>button {
     background: linear-gradient(135deg, #facc15, #eab308);
@@ -54,14 +50,14 @@ def clean_text(text):
     tokens = [w for w in text.split() if w not in stop_words and len(w) > 2]
     return " ".join(tokens)
 
-# ================== KAMUS KATA ==================
+# ================== KAMUS SENTIMEN ==================
 NEGATIVE_WORDS = [
     "kecewa","buruk","jelek","lambat","ribet","error","parah","mengecewakan",
     "anjing","bangsat","kontol","tai","bajingan","penipu","tolol","bodoh","goblok"
 ]
 
 NEUTRAL_WORDS = [
-    "lumayan","biasa","cukup","standar","okelah"
+    "lumayan","biasa","cukup","standar","oke"
 ]
 
 POSITIVE_WORDS = [
@@ -73,13 +69,13 @@ def auto_rating_from_text(text):
     text = text.lower()
 
     if any(w in text for w in NEGATIVE_WORDS):
-        return 1  # negatif
-    if any(w in text for w in NEUTRAL_WORDS):
-        return 3  # netral
-    if any(w in text for w in POSITIVE_WORDS):
-        return 5  # positif
-
-    return 3  # default netral
+        return 1
+    elif any(w in text for w in NEUTRAL_WORDS):
+        return 3
+    elif any(w in text for w in POSITIVE_WORDS):
+        return 5
+    else:
+        return 3
 
 def sentiment_from_rating(rating):
     if rating <= 2:
@@ -90,9 +86,8 @@ def sentiment_from_rating(rating):
         return "Positif"
 
 # ================== SESSION ==================
-for key in ["df"]:
-    if key not in st.session_state:
-        st.session_state[key] = None
+if "df" not in st.session_state:
+    st.session_state.df = None
 
 # ================== UI ==================
 st.title("📊 Sistem Analisis Sentimen Akulaku")
@@ -115,33 +110,25 @@ if menu == "📂 Upload Dataset":
 
         st.session_state.df = df
 
-        st.success("✅ Dataset berhasil diproses")
+        st.success("✅ Dataset berhasil diproses otomatis")
         st.dataframe(df.head())
 
 # ================== PREDIKSI ==================
 elif menu == "✍️ Prediksi Kalimat":
     text = st.text_area("Masukkan ulasan")
-    rating_manual = st.selectbox("Rating (opsional)", [None,1,2,3,4,5])
 
     if st.button("Analisis"):
         if not text.strip():
             st.warning("Teks kosong")
         else:
             clean = clean_text(text)
-
-            if rating_manual is not None:
-                rating = rating_manual
-                sumber = "Manual"
-            else:
-                rating = auto_rating_from_text(clean)
-                sumber = "Otomatis dari teks"
-
+            rating = auto_rating_from_text(clean)
             sentiment = sentiment_from_rating(rating)
 
             st.success(f"""
-**Hasil Analisis**
-- Rating: **{rating}** ({sumber})
-- Sentimen: **{sentiment}**
+### ✅ Hasil Analisis Otomatis
+- **Rating** : {rating}
+- **Sentimen** : {sentiment}
 """)
 
 # ================== DASHBOARD ==================
