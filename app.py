@@ -46,14 +46,6 @@ except LookupError:
 
 stop_words = set(stopwords.words("indonesian"))
 
-# ================== INIT SESSION (ANTI ERROR) ==================
-if "df" not in st.session_state:
-    st.session_state.df = None
-if "text_col" not in st.session_state:
-    st.session_state.text_col = None
-if "label_col" not in st.session_state:
-    st.session_state.label_col = "sentiment"
-
 # ================== CLEAN TEXT ==================
 def clean_text(text):
     if pd.isna(text):
@@ -62,36 +54,31 @@ def clean_text(text):
     text = re.sub(r"http\S+|www\S+", "", text)
     text = re.sub(r"[^a-zA-Z\s]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
-    tokens = [w for w in text.split() if w not in stop_words]
+    tokens = [w for w in text.split() if w not in stop_words and len(w) > 2]
     return " ".join(tokens)
 
-# ================== KATA KASAR (PASTI NEGATIF) ==================
+# ================== KATA KASAR (PAKSA NEGATIF) ==================
 BAD_WORDS = [
     "anjing","bangsat","kontol","tai","bajingan","penipu",
-    "tolol","bodoh","goblok","parah","kecewa","bohong",
-    "gagal","error","ribet","susah","pending"
+    "tolol","bodoh","goblok","brengsek","keparat"
 ]
 
 def contains_bad_words(text):
     text = str(text).lower()
     return any(w in text for w in BAD_WORDS)
 
-# ================== RULE SENTIMENT (FINAL FIX) ==================
-def sentiment_from_score_and_text(score, text):
-    # kata kasar SELALU negatif
-    if contains_bad_words(text):
-        return "Negatif"
-
+# ================== SENTIMEN BERDASARKAN RATING ==================
+def sentiment_from_rating(rating):
     try:
-        score = int(score)
+        rating = int(rating)
     except:
         return "Netral"
 
-    if score <= 2:
+    if rating <= 2:
         return "Negatif"
-    elif score == 3:
+    elif rating == 3:
         return "Netral"
-    else:  # 4–5
+    else:
         return "Positif"
 
 # ================== UTIL ==================
@@ -110,6 +97,11 @@ def load_csv_safe(file):
             continue
     return None
 
+# ================== SESSION STATE (ANTI ERROR) ==================
+for key in ["df", "text_col", "label_col", "rating_col"]:
+    if key not in st.session_state:
+        st.session_state[key] = None
+
 # ================== UI ==================
 st.title("📊 Sistem Analisis Sentimen Akulaku")
 
@@ -118,9 +110,9 @@ menu = st.sidebar.selectbox(
     ["📂 Upload Dataset", "✍️ Prediksi Kalimat", "📊 Dashboard", "🧠 Modeling & Evaluasi", "⬇️ Download"]
 )
 
-# ================== UPLOAD DATASET ==================
+# ================== UPLOAD ==================
 if menu == "📂 Upload Dataset":
-    file = st.file_uploader("Upload file CSV", type=["csv"])
+    file = st.file_uploader("Upload CSV", type=["csv"])
     if file:
         df = load_csv_safe(file)
         if df is None:
@@ -130,89 +122,86 @@ if menu == "📂 Upload Dataset":
         text_col = detect_column(df, ["review","ulasan","content","text"])
         rating_col = detect_column(df, ["rating","score","bintang"])
 
-        if text_col is None or rating_col is None:
-            st.error("CSV wajib punya kolom TEKS dan RATING")
-            st.stop()
+        if text_col is None:
+            text_col = df.columns[0]
 
         df["clean_text"] = df[text_col].apply(clean_text)
-        df["sentiment"] = df.apply(
-            lambda x: sentiment_from_score_and_text(x[rating_col], x[text_col]),
-            axis=1
-        )
+
+        # SENTIMEN DARI RATING
+        if rating_col:
+            df["sentiment"] = df[rating_col].apply(sentiment_from_rating)
+        else:
+            df["sentiment"] = "Netral"
+
+        # PAKSA NEGATIF JIKA ADA KATA KASAR
+        df.loc[df["clean_text"].apply(contains_bad_words), "sentiment"] = "Negatif"
 
         st.session_state.df = df
         st.session_state.text_col = text_col
+        st.session_state.label_col = "sentiment"
         st.session_state.rating_col = rating_col
 
-        st.success("✅ Dataset berhasil diproses (aturan skor sudah BENAR)")
+        st.success("✅ Dataset berhasil dimuat & diproses")
         st.dataframe(df.head())
 
 # ================== PREDIKSI ==================
 elif menu == "✍️ Prediksi Kalimat":
     text = st.text_area("Masukkan ulasan")
-    score = st.selectbox("Pilih skor (0–5)", [0,1,2,3,4,5])
+    rating = st.selectbox("Rating (opsional)", [None,1,2,3,4,5])
 
     if st.button("Analisis"):
-        hasil = sentiment_from_score_and_text(score, text)
-        if hasil == "Negatif":
-            st.error(f"Hasil Sentimen: {hasil}")
-        elif hasil == "Netral":
-            st.info(f"Hasil Sentimen: {hasil}")
+        if not text.strip():
+            st.warning("Teks kosong")
+        elif contains_bad_words(text):
+            st.error("Hasil: Negatif (kata kasar terdeteksi)")
+        elif rating is not None:
+            st.success(f"Hasil: {sentiment_from_rating(rating)}")
         else:
-            st.success(f"Hasil Sentimen: {hasil}")
+            st.info("Hasil: Netral")
 
-# ================== DASHBOARD (GRAFIK LENGKAP) ==================
+# ================== DASHBOARD ==================
 elif menu == "📊 Dashboard":
     if st.session_state.df is None:
         st.warning("Upload dataset terlebih dahulu")
         st.stop()
 
     df = st.session_state.df
+    label_col = st.session_state.label_col
+    rating_col = st.session_state.rating_col
 
-    st.subheader("🎯 DISTRIBUSI SENTIMEN")
+    st.subheader("📊 DISTRIBUSI SENTIMEN")
 
-    counts = df["sentiment"].value_counts()
-    total = len(df)
-
-    st.text(
-        f"""POSITIVE : {counts.get('Positif',0):,}
-NEUTRAL  : {counts.get('Netral',0):,}
-NEGATIVE : {counts.get('Negatif',0):,}
-"""
-    )
+    counts = df[label_col].value_counts()
 
     col1, col2, col3 = st.columns(3)
 
-    # Bar Sentimen
+    # BAR
     with col1:
         fig, ax = plt.subplots()
-        counts.plot(kind="bar", ax=ax, color=["green","gold","red"])
+        counts.plot(kind="bar", ax=ax, color=["green","red","gold"])
         ax.set_title("Jumlah Review per Sentimen")
         st.pyplot(fig)
 
-    # Pie
+    # PIE
     with col2:
         fig, ax = plt.subplots()
-        ax.pie(
-            counts,
-            labels=counts.index,
-            autopct="%1.1f%%",
-            colors=["green","gold","red"],
-            startangle=90
-        )
+        ax.pie(counts, labels=counts.index, autopct="%1.1f%%", startangle=90)
         ax.set_title("Persentase Sentimen")
         st.pyplot(fig)
 
-    # Rating vs Sentimen
+    # RATING
     with col3:
-        grp = df.groupby([st.session_state.rating_col, "sentiment"]).size().unstack(fill_value=0)
-        fig, ax = plt.subplots()
-        grp.plot(kind="bar", ax=ax)
-        ax.set_title("Distribusi Rating per Sentimen")
-        st.pyplot(fig)
+        if rating_col:
+            fig, ax = plt.subplots()
+            grp = df.groupby([rating_col, label_col]).size().unstack(fill_value=0)
+            grp.plot(kind="bar", ax=ax)
+            ax.set_title("Distribusi Rating per Sentimen")
+            st.pyplot(fig)
+        else:
+            st.info("Kolom rating tidak tersedia")
 
-    st.subheader("📋 DATASET")
-    st.dataframe(df, use_container_width=True)
+    st.subheader("📄 DATA LABELING")
+    st.dataframe(df)
 
 # ================== MODELING ==================
 elif menu == "🧠 Modeling & Evaluasi":
@@ -243,9 +232,4 @@ elif menu == "⬇️ Download":
         st.warning("Tidak ada data")
     else:
         csv = st.session_state.df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "Download CSV",
-            csv,
-            "hasil_sentimen_akulaku.csv",
-            "text/csv"
-        )
+        st.download_button("Download CSV", csv, "hasil_sentimen.csv", "text/csv")
