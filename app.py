@@ -18,22 +18,22 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================== STYLE (ESTETIK – TANPA UBAH FUNGSI) ==================
+# ================== STYLE (BIRU & KUNING – TANPA UBAH FUNGSI) ==================
 st.markdown("""
 <style>
 
 /* ===== Background utama ===== */
 .stApp {
-    background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 50%, #e0e7ff 100%);
+    background: linear-gradient(135deg, #e0f2fe 0%, #fffde7 50%, #e0f2fe 100%);
     color: #0f172a;
 }
 
 /* ===== Sidebar ===== */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0f172a, #1e293b);
+    background: linear-gradient(180deg, #1e3a8a, #1e40af);
 }
 section[data-testid="stSidebar"] * {
-    color: #e5e7eb !important;
+    color: #fffde7 !important;
 }
 
 /* ===== Judul ===== */
@@ -42,7 +42,7 @@ h1 {
     font-weight: 800;
 }
 h2, h3 {
-    color: #1e40af;
+    color: #1d4ed8;
     font-weight: 700;
 }
 
@@ -52,28 +52,28 @@ div[data-testid="stDataFrame"] {
     background-color: #ffffff;
     border-radius: 14px;
     padding: 14px;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 10px 28px rgba(30, 64, 175, 0.18);
 }
 
 /* ===== Button ===== */
 .stButton>button {
-    background: linear-gradient(135deg, #2563eb, #1e40af);
-    color: white;
+    background: linear-gradient(135deg, #facc15, #eab308);
+    color: #1e3a8a;
     border-radius: 10px;
     padding: 0.6em 1.4em;
-    font-weight: 600;
+    font-weight: 700;
     border: none;
-    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+    box-shadow: 0 6px 18px rgba(234, 179, 8, 0.45);
 }
 .stButton>button:hover {
-    background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
+    background: linear-gradient(135deg, #fde047, #facc15);
     transform: translateY(-1px);
 }
 
 /* ===== Input & textarea ===== */
 textarea, input {
     border-radius: 10px !important;
-    border: 1px solid #c7d2fe !important;
+    border: 1px solid #93c5fd !important;
 }
 
 /* ===== Alert ===== */
@@ -256,7 +256,7 @@ NEGATIVE : {counts['Negatif']:,} ({counts['Negatif']/total*100:.1f}%)
         fig, ax = plt.subplots()
         counts.loc[["Positif","Negatif","Netral"]].plot(
             kind="bar", ax=ax,
-            color=["green","red","gold"]
+            color=["#22c55e","#ef4444","#eab308"]
         )
         ax.set_title("Jumlah Review per Sentimen")
         st.pyplot(fig)
@@ -267,7 +267,7 @@ NEGATIVE : {counts['Negatif']:,} ({counts['Negatif']/total*100:.1f}%)
             counts.loc[["Positif","Negatif","Netral"]],
             labels=["positive","negative","neutral"],
             autopct="%1.1f%%",
-            colors=["green","red","gold"],
+            colors=["#22c55e","#ef4444","#eab308"],
             startangle=90
         )
         ax.set_title("Persentase Sentimen")
