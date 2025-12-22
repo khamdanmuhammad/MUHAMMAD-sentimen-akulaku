@@ -18,7 +18,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================== STYLE (BIRU & KUNING – TANPA UBAH FUNGSI) ==================
+# ================== STYLE (BIRU & KUNING – TEKS SIDEBAR HITAM) ==================
 st.markdown("""
 <style>
 
@@ -28,12 +28,29 @@ st.markdown("""
     color: #1e293b;
 }
 
-/* ===== Sidebar ===== */
+/* ===== Sidebar background ===== */
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #1e3a8a, #1e40af);
 }
-section[data-testid="stSidebar"] * {
-    color: #fffbea !important;
+
+/* ===== Sidebar container (card menu) ===== */
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 12px;
+}
+
+/* ===== FIX: TULISAN MENU & SELECTBOX JADI HITAM ===== */
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] span,
+section[data-testid="stSidebar"] div,
+section[data-testid="stSidebar"] p {
+    color: #000000 !important;
+}
+
+/* ===== Dropdown selectbox ===== */
+section[data-testid="stSidebar"] [data-baseweb="select"] * {
+    color: #000000 !important;
 }
 
 /* ===== Judul ===== */
@@ -67,7 +84,6 @@ div[data-testid="stDataFrame"] {
 }
 .stButton>button:hover {
     background: linear-gradient(135deg, #fde047, #facc15);
-    transform: translateY(-1px);
 }
 
 /* ===== Input & textarea ===== */
@@ -235,56 +251,6 @@ elif menu == "📊 Dashboard":
     label_col = st.session_state.label_col
 
     st.subheader("🎯 DISTRIBUSI SENTIMEN")
-
-    counts = df[label_col].value_counts()
-    total = len(df)
-
-    for k in ["Positif","Netral","Negatif"]:
-        if k not in counts:
-            counts[k] = 0
-
-    st.text(
-        f"""POSITIVE : {counts['Positif']:,} ({counts['Positif']/total*100:.1f}%)
-NEUTRAL  : {counts['Netral']:,} ({counts['Netral']/total*100:.1f}%)
-NEGATIVE : {counts['Negatif']:,} ({counts['Negatif']/total*100:.1f}%)
-"""
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        fig, ax = plt.subplots()
-        counts.loc[["Positif","Negatif","Netral"]].plot(
-            kind="bar", ax=ax,
-            color=["#2563eb","#dc2626","#facc15"]
-        )
-        ax.set_title("Jumlah Review per Sentimen")
-        st.pyplot(fig)
-
-    with col2:
-        fig, ax = plt.subplots()
-        ax.pie(
-            counts.loc[["Positif","Negatif","Netral"]],
-            labels=["positive","negative","neutral"],
-            autopct="%1.1f%%",
-            colors=["#2563eb","#dc2626","#facc15"],
-            startangle=90
-        )
-        ax.set_title("Persentase Sentimen")
-        st.pyplot(fig)
-
-    with col3:
-        rating_col = detect_column(df, ["rating","score","bintang"])
-        if rating_col is None:
-            st.info("ℹ️ Kolom rating tidak tersedia")
-        else:
-            fig, ax = plt.subplots()
-            grp = df.groupby([rating_col, label_col]).size().unstack(fill_value=0)
-            grp.plot(kind="bar", ax=ax)
-            ax.set_title("Distribusi Rating per Sentimen")
-            st.pyplot(fig)
-
-    st.subheader("=== LABELING SENTIMEN ===")
     st.dataframe(df, use_container_width=True)
 
 # ================== MODELING & EVALUASI ==================
