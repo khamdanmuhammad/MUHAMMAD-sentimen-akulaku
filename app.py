@@ -19,17 +19,73 @@ st.set_page_config(
 # ================== STYLE ==================
 st.markdown("""
 <style>
+/* ===== GLOBAL ===== */
 .stApp {
-    background: linear-gradient(135deg, #e0f2fe, #fefce8);
+    background: linear-gradient(135deg, #eef6ff, #fffdf2);
+    color: #000000;
+    font-family: 'Segoe UI', sans-serif;
 }
-.stButton>button {
-    background: linear-gradient(135deg, #facc15, #eab308);
-    color: black;
+
+/* ===== SIDEBAR ===== */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #ffffff, #f1f5f9);
+    border-right: 1px solid #e5e7eb;
+}
+
+section[data-testid="stSidebar"] * {
+    color: #000000 !important;
+    font-weight: 500;
+}
+
+/* ===== SIDEBAR SELECTBOX ===== */
+section[data-testid="stSidebar"] .stSelectbox > div {
+    border-radius: 14px;
+    background-color: #ffffff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+/* Dropdown item */
+section[data-testid="stSidebar"] ul {
+    border-radius: 12px;
+}
+
+/* ===== ACTIVE ITEM ===== */
+section[data-testid="stSidebar"] li[aria-selected="true"] {
+    background: linear-gradient(135deg, #fde68a, #facc15);
     border-radius: 10px;
     font-weight: 700;
 }
+
+/* ===== HOVER EFFECT ===== */
+section[data-testid="stSidebar"] li:hover {
+    background-color: #fef3c7;
+    border-radius: 10px;
+}
+
+/* ===== BUTTON ===== */
+.stButton > button {
+    background: linear-gradient(135deg, #facc15, #eab308);
+    color: #000000;
+    border-radius: 14px;
+    font-weight: 700;
+    padding: 0.6em 1.4em;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+/* ===== SUCCESS BOX ===== */
+div[data-testid="stAlert"] {
+    border-radius: 14px;
+    font-weight: 600;
+}
+
+/* ===== DATAFRAME ===== */
+.stDataFrame {
+    border-radius: 14px;
+    overflow: hidden;
+}
 </style>
 """, unsafe_allow_html=True)
+
 
 # ================== NLTK ==================
 try:
