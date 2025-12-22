@@ -18,17 +18,74 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================== STYLE ==================
+# ================== STYLE (ESTETIK – TANPA UBAH FUNGSI) ==================
 st.markdown("""
 <style>
-.main {background-color: #f8fafc;}
-h1, h2, h3 {color: #0f172a;}
-.stButton>button {
-    background-color: #2563eb;
-    color: white;
-    border-radius: 8px;
-    padding: 0.6em 1.2em;
+
+/* ===== Background utama ===== */
+.stApp {
+    background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 50%, #e0e7ff 100%);
+    color: #0f172a;
 }
+
+/* ===== Sidebar ===== */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0f172a, #1e293b);
+}
+section[data-testid="stSidebar"] * {
+    color: #e5e7eb !important;
+}
+
+/* ===== Judul ===== */
+h1 {
+    color: #1e3a8a;
+    font-weight: 800;
+}
+h2, h3 {
+    color: #1e40af;
+    font-weight: 700;
+}
+
+/* ===== Card-style container ===== */
+div[data-testid="stVerticalBlock"],
+div[data-testid="stDataFrame"] {
+    background-color: #ffffff;
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+/* ===== Button ===== */
+.stButton>button {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    color: white;
+    border-radius: 10px;
+    padding: 0.6em 1.4em;
+    font-weight: 600;
+    border: none;
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+}
+.stButton>button:hover {
+    background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
+    transform: translateY(-1px);
+}
+
+/* ===== Input & textarea ===== */
+textarea, input {
+    border-radius: 10px !important;
+    border: 1px solid #c7d2fe !important;
+}
+
+/* ===== Alert ===== */
+div[data-testid="stAlert"] {
+    border-radius: 12px;
+}
+
+/* ===== Footer ===== */
+footer {
+    visibility: hidden;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -195,7 +252,6 @@ NEGATIVE : {counts['Negatif']:,} ({counts['Negatif']/total*100:.1f}%)
 
     col1, col2, col3 = st.columns(3)
 
-    # Grafik 1
     with col1:
         fig, ax = plt.subplots()
         counts.loc[["Positif","Negatif","Netral"]].plot(
@@ -205,7 +261,6 @@ NEGATIVE : {counts['Negatif']:,} ({counts['Negatif']/total*100:.1f}%)
         ax.set_title("Jumlah Review per Sentimen")
         st.pyplot(fig)
 
-    # Grafik 2
     with col2:
         fig, ax = plt.subplots()
         ax.pie(
@@ -218,7 +273,6 @@ NEGATIVE : {counts['Negatif']:,} ({counts['Negatif']/total*100:.1f}%)
         ax.set_title("Persentase Sentimen")
         st.pyplot(fig)
 
-    # Grafik 3
     with col3:
         rating_col = detect_column(df, ["rating","score","bintang"])
         if rating_col is None:
