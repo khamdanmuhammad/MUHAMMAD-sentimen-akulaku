@@ -9,12 +9,8 @@ import matplotlib.pyplot as plt
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import accuracy_score, classification_report, f1_score
-
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import LinearSVC
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
 
 # ================== KONFIG ==================
 st.set_page_config(
@@ -108,6 +104,19 @@ def load_csv_safe(file):
             continue
     return None
 
+# ================== TRAIN MODEL ==================
+def train_model(df, text_col, label_col):
+    vectorizer = TfidfVectorizer(ngram_range=(1,2), max_features=15000)
+    X = vectorizer.fit_transform(df[text_col])
+    y = df[label_col]
+
+    model = MultinomialNB(alpha=0.5)
+    model.fit(X, y)
+
+    os.makedirs("model", exist_ok=True)
+    joblib.dump(model, "model/model.pkl")
+    joblib.dump(vectorizer, "model/tfidf.pkl")
+
 # ================== UI ==================
 st.title("📊 Sistem Analisis Sentimen Akulaku")
 
@@ -144,36 +153,35 @@ if menu == "📂 Upload Dataset":
         df[label_col] = df[label_col].apply(normalize_label)
         df = df[df[text_col].str.len() > 3]
 
+        train_model(df, text_col, label_col)
+
         st.session_state.df = df
         st.session_state.text_col = text_col
         st.session_state.label_col = label_col
 
-        st.success("✅ Dataset berhasil diproses")
+        st.success("✅ Dataset berhasil diproses & model dilatih")
         st.bar_chart(df[label_col].value_counts())
 
 # ================== PREDIKSI ==================
 elif menu == "✍️ Prediksi Kalimat":
     st.subheader("✍️ Prediksi Sentimen")
+
     text = st.text_area("Masukkan ulasan", height=120)
 
     if st.button("🔍 Analisis"):
         if not text.strip():
             st.warning("⚠️ Teks kosong")
+        elif not os.path.exists("model/model.pkl"):
+            st.error("⚠️ Model belum tersedia")
         else:
             rule = rule_based_sentiment(text)
             if rule:
                 st.success(f"Hasil: {rule} (Rule-Based)")
             else:
-                if "df" not in st.session_state:
-                    st.warning("⚠️ Upload dataset dulu")
-                else:
-                    tfidf = TfidfVectorizer(ngram_range=(1,2), max_features=15000)
-                    X = tfidf.fit_transform(st.session_state.df[st.session_state.text_col])
-                    y = st.session_state.df[st.session_state.label_col]
-                    model = MultinomialNB(alpha=0.5)
-                    model.fit(X, y)
-                    pred = model.predict(tfidf.transform([clean_text(text)]))[0]
-                    st.success(f"Hasil: {pred} (Machine Learning)")
+                model = joblib.load("model/model.pkl")
+                tfidf = joblib.load("model/tfidf.pkl")
+                pred = model.predict(tfidf.transform([clean_text(text)]))[0]
+                st.success(f"Hasil: {pred} (Machine Learning)")
 
 # ================== DASHBOARD ==================
 elif menu == "📊 Dashboard":
@@ -191,119 +199,30 @@ elif menu == "📊 Dashboard":
 
 # ================== MODELING & EVALUASI ==================
 elif menu == "🧠 Modeling & Evaluasi":
-    st.subheader("=== MODELING DAN EVALUASI ===")
-
     if "df" not in st.session_state:
         st.warning("⚠️ Upload dataset terlebih dahulu")
-        st.stop()
+    else:
+        df = st.session_state.df
+        text_col = st.session_state.text_col
+        label_col = st.session_state.label_col
 
-    df = st.session_state.df
-    text_col = st.session_state.text_col
-    label_col = st.session_state.label_col
+        X_train, X_test, y_train, y_test = train_test_split(
+            df[text_col], df[label_col],
+            test_size=0.2, random_state=42, stratify=df[label_col]
+        )
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        df[text_col], df[label_col],
-        test_size=0.3,
-        random_state=42,
-        stratify=df[label_col]
-    )
+        tfidf = TfidfVectorizer(ngram_range=(1,2), max_features=15000)
+        X_train_vec = tfidf.fit_transform(X_train)
+        X_test_vec = tfidf.transform(X_test)
 
-    st.text(f"""📊 DISTRIBUSI DATA:
-   Training set: {len(X_train):,} samples ({len(X_train)/len(df)*100:.1f}%)
-   Test set    : {len(X_test):,} samples ({len(X_test)/len(df)*100:.1f}%)
-""")
-
-    def dist(y):
-        return y.value_counts()
-
-    tr, te = dist(y_train), dist(y_test)
-
-    st.text(f"""📈 DISTRIBUSI SENTIMEN DI SETIAP SPLIT:
-
-   Training:
-      negative: {tr.get("Negatif",0):,}
-      neutral : {tr.get("Netral",0):,}
-      positive: {tr.get("Positif",0):,}
-
-   Test:
-      negative: {te.get("Negatif",0):,}
-      neutral : {te.get("Netral",0):,}
-      positive: {te.get("Positif",0):,}
-""")
-
-    tfidf = TfidfVectorizer(ngram_range=(1,2), max_features=15000)
-    X_train_vec = tfidf.fit_transform(X_train)
-    X_test_vec = tfidf.transform(X_test)
-
-    models = {
-        "Multinomial Naive Bayes": MultinomialNB(alpha=0.5),
-        "Logistic Regression": LogisticRegression(max_iter=1000),
-        "Linear SVM": LinearSVC(),
-        "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
-    }
-
-    results = []
-    best_model = None
-    best_f1 = 0
-    best_pred = None
-
-    for name, model in models.items():
+        model = MultinomialNB(alpha=0.5)
         model.fit(X_train_vec, y_train)
+        y_pred = model.predict(X_test_vec)
 
-        train_pred = model.predict(X_train_vec)
-        test_pred = model.predict(X_test_vec)
+        acc = accuracy_score(y_test, y_pred)
+        st.success(f"🎯 Akurasi Model: {acc:.4f}")
 
-        acc_tr = accuracy_score(y_train, train_pred)
-        acc_te = accuracy_score(y_test, test_pred)
-        f1_tr = f1_score(y_train, train_pred, average="weighted")
-        f1_te = f1_score(y_test, test_pred, average="weighted")
-
-        cv = cross_val_score(model, X_train_vec, y_train, cv=5, scoring="f1_weighted")
-
-        st.text(f"""
-============================================================
-🎯 MODEL: {name}
-============================================================
-
-   📊 PERFORMANCE:
-      Akurasi Training : {acc_tr:.4f}
-      Akurasi Test     : {acc_te:.4f}
-      F1-Score Training: {f1_tr:.4f}
-      F1-Score Test    : {f1_te:.4f}
-
-   🔄 CROSS-VALIDATION (5-fold):
-      CV Scores: {cv}
-      CV Mean  : {cv.mean():.4f}
-      CV Std   : {cv.std():.4f}
-
-   📋 CLASSIFICATION REPORT (Test Set):
-{classification_report(y_test, test_pred)}
-""")
-
-        results.append([name, acc_te, f1_te, cv.mean(), cv.std()])
-
-        if f1_te > best_f1:
-            best_f1 = f1_te
-            best_model = name
-            best_pred = test_pred
-
-    result_df = pd.DataFrame(
-        results,
-        columns=["Model", "Test Accuracy", "Test F1-Score", "CV Mean", "CV Std"]
-    )
-
-    st.subheader("📈 PERBANDINGAN SEMUA MODEL")
-    st.dataframe(result_df, use_container_width=True)
-
-    st.success(f"🏆 MODEL TERBAIK: {best_model}")
-
-    mis = (y_test != best_pred).sum()
-    st.text(f"""🔍 ANALISIS ERROR - {best_model}
-   Total misclassified: {mis} ({mis/len(y_test)*100:.1f}%)
-""")
-
-    if mis == 0:
-        st.success("✅ Tidak ada data salah klasifikasi. Tanpa error.")
+        st.text(classification_report(y_test, y_pred))
 
 # ================== DOWNLOAD ==================
 elif menu == "⬇️ Download":
