@@ -3,12 +3,14 @@ import pandas as pd
 import re
 import nltk
 import matplotlib.pyplot as plt
+import numpy as np
 
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from wordcloud import WordCloud
 
 # ================== KONFIG ==================
 st.set_page_config(
@@ -19,74 +21,37 @@ st.set_page_config(
 # ================== STYLE ==================
 st.markdown("""
 <style>
-/* ===== GLOBAL ===== */
 .stApp {
     background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
     color: #000000;
     font-family: 'Segoe UI', sans-serif;
 }
-
-/* ===== SIDEBAR ===== */
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #ffffff, #ecfdf5);
     border-right: 1px solid #bbf7d0;
 }
-
-/* Semua teks sidebar tetap hitam */
 section[data-testid="stSidebar"] * {
     color: #000000 !important;
     font-weight: 500;
 }
-
-/* ===== SELECTBOX MENU ===== */
 section[data-testid="stSidebar"] .stSelectbox > div {
     background-color: #ffffff;
     border-radius: 14px;
     box-shadow: 0 6px 14px rgba(16, 185, 129, 0.15);
     border: 1px solid #bbf7d0;
 }
-
-/* ===== DROPDOWN ITEM ===== */
-section[data-testid="stSidebar"] ul {
-    border-radius: 12px;
-}
-
-/* ===== ITEM AKTIF ===== */
 section[data-testid="stSidebar"] li[aria-selected="true"] {
     background: linear-gradient(135deg, #86efac, #4ade80);
     border-radius: 10px;
     font-weight: 700;
 }
-
-/* ===== HOVER EFFECT ===== */
-section[data-testid="stSidebar"] li:hover {
-    background-color: #dcfce7;
-    border-radius: 10px;
-}
-
-/* ===== BUTTON ===== */
 .stButton > button {
     background: linear-gradient(135deg, #4ade80, #22c55e);
     color: #000000;
     border-radius: 14px;
     font-weight: 700;
     padding: 0.6em 1.4em;
-    box-shadow: 0 6px 14px rgba(34, 197, 94, 0.25);
     border: none;
-}
-
-/* ===== ALERT / SUCCESS ===== */
-div[data-testid="stAlert"] {
-    border-radius: 14px;
-    font-weight: 600;
-    border-left: 6px solid #22c55e;
-}
-
-/* ===== DATAFRAME ===== */
-.stDataFrame {
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -110,18 +75,14 @@ def clean_text(text):
     tokens = [w for w in text.split() if w not in stop_words and len(w) > 2]
     return " ".join(tokens)
 
-# ================== KAMUS RATING TEKS ==================
-NEGATIVE_WORDS = [
-    "kecewa","buruk","jelek","lambat","ribet","error","parah","mengecewakan",
-    "anjing","bangsat","kontol","tai","bajingan","penipu","tolol","bodoh","goblok"
-]
+# ================== KAMUS ==================
+NEGATIVE_WORDS = ["kecewa","buruk","jelek","lambat","ribet","error","parah",
+                  "anjing","bangsat","kontol","tai","penipu","tolol","bodoh"]
 NEUTRAL_WORDS = ["lumayan","biasa","cukup","standar","oke"]
-POSITIVE_WORDS = [
-    "bagus","baik","mantap","membantu","recommended","good","suka","cepat","aman"
-]
+POSITIVE_WORDS = ["bagus","baik","mantap","membantu","recommended",
+                  "good","suka","cepat","aman"]
 
 def auto_rating_from_text(text):
-    text = text.lower()
     if any(w in text for w in NEGATIVE_WORDS):
         return 1
     elif any(w in text for w in POSITIVE_WORDS):
@@ -129,7 +90,7 @@ def auto_rating_from_text(text):
     elif any(w in text for w in NEUTRAL_WORDS):
         return 3
     else:
-        return 3  # netral hanya jika BENAR-BENAR tidak terdeteksi
+        return 3
 
 def sentiment_from_rating(rating):
     rating = int(rating)
@@ -143,38 +104,23 @@ def sentiment_from_rating(rating):
 # ================== SESSION ==================
 if "df" not in st.session_state:
     st.session_state.df = None
-if "rating_col" not in st.session_state:
-    st.session_state.rating_col = None
 
 # ================== UI ==================
 st.title("📊 Sistem Analisis Sentimen Akulaku")
 
 menu = st.sidebar.selectbox(
     "📌 Menu",
-    [
-        "📂 Upload Dataset",
-        "✍️ Prediksi Kalimat",
-        "📊 Dashboard",
-        "🧠 Modeling & Evaluasi",
-        "⬇️ Download CSV"
-    ]
+    ["📂 Upload Dataset","✍️ Prediksi Kalimat","📊 Dashboard","🧠 Modeling & Evaluasi","⬇️ Download CSV"]
 )
 
-# ================== UPLOAD DATASET ==================
+# ================== UPLOAD ==================
 if menu == "📂 Upload Dataset":
     file = st.file_uploader("Upload CSV", type=["csv"])
     if file:
         df = pd.read_csv(file)
 
-        text_col, rating_col = None, None
-        for col in df.columns:
-            if any(k in col.lower() for k in ["review","ulasan","content","text"]):
-                text_col = col
-            if any(k in col.lower() for k in ["rating","score","bintang"]):
-                rating_col = col
-
-        if text_col is None:
-            text_col = df.columns[0]
+        text_col = next((c for c in df.columns if any(k in c.lower() for k in ["review","ulasan","content","text"])), df.columns[0])
+        rating_col = next((c for c in df.columns if any(k in c.lower() for k in ["rating","score","bintang"])), None)
 
         df["clean_text"] = df[text_col].apply(clean_text)
 
@@ -187,28 +133,17 @@ if menu == "📂 Upload Dataset":
         df["sentiment"] = df["rating_auto"].apply(sentiment_from_rating)
 
         st.session_state.df = df
-        st.session_state.rating_col = rating_col
-
-        st.success("✅ Dataset diproses SESUAI SKOR (TIDAK NETRAL SEMUA)")
+        st.success("✅ Dataset berhasil diproses")
         st.dataframe(df.head())
 
-# ================== PREDIKSI KALIMAT ==================
+# ================== PREDIKSI ==================
 elif menu == "✍️ Prediksi Kalimat":
     text = st.text_area("Masukkan ulasan")
-
     if st.button("Analisis"):
-        if not text.strip():
-            st.warning("Teks kosong")
-        else:
-            clean = clean_text(text)
-            rating = auto_rating_from_text(clean)
-            sentiment = sentiment_from_rating(rating)
-
-            st.success(f"""
-### ✅ Hasil Analisis
-- **Rating** : {rating}
-- **Sentimen** : {sentiment}
-""")
+        clean = clean_text(text)
+        rating = auto_rating_from_text(clean)
+        sentiment = sentiment_from_rating(rating)
+        st.success(f"Rating: {rating} | Sentimen: {sentiment}")
 
 # ================== DASHBOARD ==================
 elif menu == "📊 Dashboard":
@@ -217,38 +152,61 @@ elif menu == "📊 Dashboard":
     else:
         df = st.session_state.df
         counts = df["sentiment"].value_counts()
-        total = counts.sum()
 
-        st.code(
-            "🎯 DISTRIBUSI SENTIMEN\n" +
-            "\n".join([f"{k}: {v:,} ({v/total*100:.1f}%)" for k,v in counts.items()]),
-            language="text"
-        )
-
-        col1, col2, col3 = st.columns(3)
-
+        col1, col2 = st.columns(2)
         with col1:
             fig, ax = plt.subplots()
             counts.plot(kind="bar", ax=ax)
-            ax.set_title("Jumlah Review per Sentimen")
             st.pyplot(fig)
 
         with col2:
             fig, ax = plt.subplots()
             ax.pie(counts, labels=counts.index, autopct="%1.1f%%")
-            ax.set_title("Persentase Sentimen")
             st.pyplot(fig)
 
-        with col3:
-            grp = df.groupby(["rating_auto","sentiment"]).size().unstack(fill_value=0)
-            fig, ax = plt.subplots()
-            grp.plot(kind="bar", ax=ax)
-            ax.set_title("Distribusi Rating per Sentimen")
-            st.pyplot(fig)
+        # ===== WORDCLOUD =====
+        st.subheader("☁️ WordCloud")
+        text_all = " ".join(df["clean_text"])
+        wc = WordCloud(width=800, height=400, background_color="white").generate(text_all)
+        fig, ax = plt.subplots(figsize=(10,4))
+        ax.imshow(wc)
+        ax.axis("off")
+        st.pyplot(fig)
 
+        # ===== CONFUSION MATRIX =====
+        st.subheader("📌 Confusion Matrix")
+        X = df["clean_text"]
+        y = df["sentiment"]
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        tfidf = TfidfVectorizer()
+        X_train = tfidf.fit_transform(X_train)
+        X_test = tfidf.transform(X_test)
+
+        model = MultinomialNB()
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+
+        labels = sorted(y.unique())
+        cm = confusion_matrix(y_test, y_pred, labels=labels)
+
+        fig, ax = plt.subplots()
+        ax.imshow(cm)
+        ax.set_xticks(range(len(labels)))
+        ax.set_yticks(range(len(labels)))
+        ax.set_xticklabels(labels)
+        ax.set_yticklabels(labels)
+        ax.set_xlabel("Prediksi")
+        ax.set_ylabel("Aktual")
+
+        for i in range(len(labels)):
+            for j in range(len(labels)):
+                ax.text(j, i, cm[i,j], ha="center", va="center")
+
+        st.pyplot(fig)
         st.dataframe(df)
 
-# ================== MODELING ==================
+# ================== MODEL ==================
 elif menu == "🧠 Modeling & Evaluasi":
     if st.session_state.df is None:
         st.warning("Upload dataset terlebih dahulu")
@@ -257,30 +215,20 @@ elif menu == "🧠 Modeling & Evaluasi":
         X = df["clean_text"]
         y = df["sentiment"]
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
-
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         tfidf = TfidfVectorizer()
-        X_train_vec = tfidf.fit_transform(X_train)
-        X_test_vec = tfidf.transform(X_test)
+        X_train = tfidf.fit_transform(X_train)
+        X_test = tfidf.transform(X_test)
 
         model = MultinomialNB()
-        model.fit(X_train_vec, y_train)
-        y_pred = model.predict(X_test_vec)
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
 
-        st.success(f"Akurasi: {accuracy_score(y_test,y_pred):.4f}")
-        st.text(classification_report(y_test,y_pred))
+        st.success(f"Akurasi: {accuracy_score(y_test, y_pred):.4f}")
+        st.text(classification_report(y_test, y_pred))
 
 # ================== DOWNLOAD ==================
 elif menu == "⬇️ Download CSV":
-    if st.session_state.df is None:
-        st.warning("Belum ada dataset")
-    else:
+    if st.session_state.df is not None:
         csv = st.session_state.df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "⬇️ Download CSV Hasil Analisis",
-            csv,
-            "hasil_analisis_sentimen_akulaku.csv",
-            "text/csv"
-        )
+        st.download_button("Download CSV", csv, "hasil_sentimen.csv", "text/csv")
