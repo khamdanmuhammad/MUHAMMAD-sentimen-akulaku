@@ -108,10 +108,57 @@ if "df" not in st.session_state:
 # ================== UI ==================
 st.title("📊 Sistem Analisis Sentimen Akulaku")
 
-menu = st.sidebar.selectbox(
-    "📌 Menu",
-    ["📂 Upload Dataset","✍️ Prediksi Kalimat","📊 Dashboard","🧠 Modeling & Evaluasi","⬇️ Download CSV"]
+# -------- CSS khusus menu ala Webframe --------
+st.markdown("""
+<style>
+.sidebar-title{
+    font-size:18px;
+    font-weight:700;
+    margin-bottom:6px;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] > label {
+    background: #ffffff !important;
+    border-radius: 16px;
+    padding: 12px 14px !important;
+    margin-bottom: 10px !important;
+    border:1px solid #bbf7d0 !important;
+    box-shadow: 0 6px 14px rgba(16, 185, 129, .18);
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
+    background:#ecfdf5 !important;
+    border:1px solid #4ade80 !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] > label div:first-child{
+    font-size:15px !important;
+    font-weight:600 !important;
+}
+
+div[data-testid="stSidebar"] div[role="radiogroup"] > label[aria-checked="true"]{
+    background:linear-gradient(135deg,#86efac,#4ade80) !important;
+    color:#000 !important;
+    font-weight:700 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -------- Judul Sidebar --------
+st.sidebar.markdown("<p class='sidebar-title'>📌 Menu</p>", unsafe_allow_html=True)
+
+# -------- Menu Ala Webframe (Radio Button) --------
+menu = st.sidebar.radio(
+    "",
+    [
+        "📂 Upload Dataset",
+        "✍️ Prediksi Kalimat",
+        "📊 Dashboard",
+        "🧠 Modeling & Evaluasi",
+        "⬇️ Download CSV"
+    ]
 )
+
 
 # ================== UPLOAD ==================
 if menu == "📂 Upload Dataset":
