@@ -273,7 +273,7 @@ elif menu == "🧠 Modeling & Evaluasi":
 
         st.success(f"Akurasi: {accuracy_score(y_test, y_pred):.4f}")
        # st.text(classification_report(y_test, y_pred))
-        laporan = laporan_klasifikasi(y_test, y_pred, output_dict=True)
+       laporan = classification_report(y_test, y_pred, output_dict=True)
         df_laporan = pd.DataFrame(laporan).transpose()
         st.table(df_laporan)
 
